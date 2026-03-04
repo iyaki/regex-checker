@@ -194,6 +194,40 @@ func TestRunAnalyzeExitCodeFailOn(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeUsesTestdataExampleConfig(t *testing.T) {
+	t.Parallel()
+
+	configPath := filepath.Join("..", "..", "testdata", "rules", "example.yaml")
+	fixturesPath := filepath.Join("..", "..", "testdata", "fixtures")
+
+	var output bytes.Buffer
+	code := run([]string{"analyze", "--config", configPath, fixturesPath}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(output.String(), "Found token") {
+		t.Fatalf("expected output to contain match message, got %q", output.String())
+	}
+}
+
+func TestRunAnalyzeUsesTestdataFailConfig(t *testing.T) {
+	t.Parallel()
+
+	configPath := filepath.Join("..", "..", "testdata", "rules", "fail.yaml")
+	fixturesPath := filepath.Join("..", "..", "testdata", "fixtures")
+
+	var output bytes.Buffer
+	code := run([]string{"analyze", "--config", configPath, fixturesPath}, &output)
+
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(output.String(), "Found token") {
+		t.Fatalf("expected output to contain match message, got %q", output.String())
+	}
+}
+
 func TestRunUsesProvidedOutputWriter(t *testing.T) {
 	t.Parallel()
 

@@ -145,7 +145,7 @@
 ## Phase 5: Tests + validation coverage
 
 **Goal:** Implement unit/integration/golden tests and quality tooling checks.
-**Status:** In progress (concurrency coverage added for scan engine)
+**Status:** In progress (testdata fixtures added for CLI analyze)
 **Paths:** `internal/**`, `testdata/`, `scripts/quality.sh`, `.github/workflows/`
 **Reference patterns:** `specs/testing-and-validations.md`
 
@@ -167,6 +167,7 @@
 - [x] Exit code behavior for invalid config and `failOn` threshold.
 - [x] JSON/SARIF output validation and deterministic ordering.
 - [x] Golden snapshots for console/JSON/SARIF outputs.
+- [x] Testdata fixtures for example/fail configs in CLI analyze.
 
 ### 5.3 Quality tooling baseline
 
@@ -239,6 +240,8 @@
 - 2026-03-04: `go test ./internal/cli -run TestBuildScanRequestUsesRuleSetConcurrencyWhenNotSetInCLI` - pass.
 - 2026-03-04: `go test ./internal/cli -run TestBuildScanRequestUsesCLIConcurrencyWhenSet` - pass.
 - 2026-03-04: `go test ./internal/config -run TestLoadRuleSetRejectsRulePathsNotList` - pass.
+- 2026-03-04: `go test ./cmd/regex-checker -run TestRunAnalyzeUsesTestdata` - pass.
+- 2026-03-04: `go test ./cmd/regex-checker` - pass.
 
 ## Summary
 

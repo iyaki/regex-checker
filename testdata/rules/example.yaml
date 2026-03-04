@@ -1,0 +1,4 @@
+rules:
+  - message: "Found token $0"
+    regex: "token=[a-z]+"
+    severity: "error"
