@@ -3,8 +3,9 @@ package output
 
 import (
 	"bytes"
-	"github.com/iyaki/regex-checker/internal/scan"
 	"testing"
+
+	"github.com/iyaki/regex-checker/internal/scan"
 )
 
 func TestWriteConsoleNoMatches(t *testing.T) {
@@ -105,5 +106,24 @@ func assertConsoleOutput(t *testing.T, got, want string) {
 
 	if got != want {
 		t.Fatalf("unexpected console output:\n%s", got)
+	}
+}
+
+func TestSeverityRankKnownValues(t *testing.T) {
+	t.Parallel()
+
+	values := []string{"error", "warning", "notice", "info"}
+	for _, value := range values {
+		if severityRank(value) == severityRankUnknown {
+			t.Fatalf("expected severity %s to have known rank", value)
+		}
+	}
+}
+
+func TestSeverityLabelUnknownUppercase(t *testing.T) {
+	t.Parallel()
+
+	if severityLabel("custom") != "CUSTOM" {
+		t.Fatalf("unexpected label for custom severity")
 	}
 }

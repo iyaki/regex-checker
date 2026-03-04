@@ -70,6 +70,34 @@ func TestRunRoutesAnalyseAlias(t *testing.T) {
 	}
 }
 
+func TestRunRoutesInit(t *testing.T) {
+	t.Parallel()
+
+	outputPath := filepath.Join(t.TempDir(), "rules.yaml")
+	var output bytes.Buffer
+	code := run([]string{"init", "--out", outputPath}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	expectedMessage := "Wrote default config to " + outputPath + "\n"
+	if output.String() != expectedMessage {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	contents := string(data)
+	if !strings.Contains(contents, "rules:") {
+		t.Fatalf("expected rules section, got %q", contents)
+	}
+	if !strings.Contains(contents, "Avoid hardcoded token") {
+		t.Fatalf("expected default rule, got %q", contents)
+	}
+}
+
 func TestRunAnalyzeWritesJSONToStdout(t *testing.T) {
 	t.Parallel()
 

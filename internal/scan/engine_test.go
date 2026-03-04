@@ -387,6 +387,59 @@ func TestCollectEntriesErrorsOnInvalidInclude(t *testing.T) {
 	}
 }
 
+func TestCollectFileEntryReturnsDirMetadata(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	entries, skipped, isFile, err := collectFileEntry(root, []string{"**/*"}, nil, 1024)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if isFile {
+		t.Fatal("expected directory root to not be treated as file")
+	}
+	if skipped != 0 {
+		t.Fatalf("expected 0 skipped, got %d", skipped)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %d", len(entries))
+	}
+}
+
+func TestCollectFileEntrySkipsNonMatchingInclude(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "sample.txt")
+	writeFileWithContent(t, path, "content")
+
+	entries, skipped, isFile, err := collectFileEntry(path, []string{"src/**"}, nil, 1024)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !isFile {
+		t.Fatal("expected file root to be treated as file")
+	}
+	if skipped != 0 {
+		t.Fatalf("expected 0 skipped, got %d", skipped)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %d", len(entries))
+	}
+}
+
+func TestSeverityRankHandlesKnownValues(t *testing.T) {
+	t.Parallel()
+
+	values := []string{"error", "warning", "notice", "info"}
+	for _, value := range values {
+		if severityRank(value) == severityRankUnknown {
+			t.Fatalf("expected severity %s to have known rank", value)
+		}
+	}
+}
+
 func TestCompileRulesUsesDefaultsAndRejectsInvalidRegex(t *testing.T) {
 	t.Parallel()
 

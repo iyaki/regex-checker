@@ -60,3 +60,23 @@ func TestMatchTextRuneLength(t *testing.T) {
 		t.Fatal("expected rune length 2")
 	}
 }
+
+func TestFormatRuleIndexPadsEachRange(t *testing.T) {
+	t.Parallel()
+
+	if got := formatRuleIndex(0); got != "0000" {
+		t.Fatalf("unexpected padding for 0: %s", got)
+	}
+	if got := formatRuleIndex(9); got != "0009" {
+		t.Fatalf("unexpected padding for 9: %s", got)
+	}
+	if got := formatRuleIndex(10); got != "0010" {
+		t.Fatalf("unexpected padding for 10: %s", got)
+	}
+	if got := formatRuleIndex(99); got != "0099" {
+		t.Fatalf("unexpected padding for 99: %s", got)
+	}
+	if got := formatRuleIndex(100); got != "0100" {
+		t.Fatalf("unexpected padding for 100: %s", got)
+	}
+}

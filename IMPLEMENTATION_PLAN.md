@@ -28,6 +28,7 @@
 - [x] Implement `analyze` handler and `analyse` alias routing.
 - [x] Print help and exit code `1` when no command is provided.
 - [x] Print a single error message and exit code `1` for unknown commands.
+- [x] Implement `init` handler and route from CLI.
 
 **Definition of Done**
 
@@ -154,6 +155,7 @@
 - [x] Path filtering include/exclude behavior.
 - [x] Scan engine line/column mapping and match aggregation.
 - [x] CLI routing for `analyze` command.
+- [x] Init command parsing and overwrite behavior.
 
 ### 5.2 Integration + golden tests
 
@@ -222,6 +224,9 @@
 - 2026-03-04: `bash scripts/quality.sh all` - pass.
 - 2026-03-04: `go test ./internal/scan -run TestRunScansFileRoot` - pass.
 - 2026-03-04: `go test ./internal/scan` - pass.
+- 2026-03-04: `go test ./internal/cli -run TestParseInitDefaults` - pass.
+- 2026-03-04: `go test ./internal/cli -run TestHandleInit` - pass.
+- 2026-03-04: `go test ./cmd/regex-checker -run TestRunRoutesInit` - pass.
 
 ## Summary
 
