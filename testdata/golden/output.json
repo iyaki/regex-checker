@@ -2,50 +2,50 @@
 	"schemaVersion": 1,
 	"matches": [
 		{
-			"Message": "Error msg",
-			"Severity": "error",
-			"FilePath": "a/file.go",
-			"Line": 2,
-			"Column": 5,
-			"MatchText": ""
+			"message": "Error msg",
+			"severity": "error",
+			"filePath": "a/file.go",
+			"line": 2,
+			"column": 5,
+			"matchText": ""
 		},
 		{
-			"Message": "Alpha warn",
-			"Severity": "warning",
-			"FilePath": "a/file.go",
-			"Line": 2,
-			"Column": 5,
-			"MatchText": ""
+			"message": "Alpha warn",
+			"severity": "warning",
+			"filePath": "a/file.go",
+			"line": 2,
+			"column": 5,
+			"matchText": ""
 		},
 		{
-			"Message": "Zulu warn",
-			"Severity": "warning",
-			"FilePath": "a/file.go",
-			"Line": 2,
-			"Column": 5,
-			"MatchText": ""
+			"message": "Zulu warn",
+			"severity": "warning",
+			"filePath": "a/file.go",
+			"line": 2,
+			"column": 5,
+			"matchText": ""
 		},
 		{
-			"Message": "Info msg",
-			"Severity": "info",
-			"FilePath": "a/file.go",
-			"Line": 10,
-			"Column": 1,
-			"MatchText": ""
+			"message": "Info msg",
+			"severity": "info",
+			"filePath": "a/file.go",
+			"line": 10,
+			"column": 1,
+			"matchText": ""
 		},
 		{
-			"Message": "Warn msg",
-			"Severity": "warning",
-			"FilePath": "b/file.go",
-			"Line": 2,
-			"Column": 3,
-			"MatchText": ""
+			"message": "Warn msg",
+			"severity": "warning",
+			"filePath": "b/file.go",
+			"line": 2,
+			"column": 3,
+			"matchText": ""
 		}
 	],
 	"stats": {
-		"FilesScanned": 2,
-		"FilesSkipped": 1,
-		"Matches": 5,
-		"DurationMs": 12
+		"filesScanned": 2,
+		"filesSkipped": 1,
+		"matches": 5,
+		"durationMs": 12
 	}
 }

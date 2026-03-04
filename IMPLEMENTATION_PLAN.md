@@ -160,6 +160,7 @@
 - [x] Init command parsing and overwrite behavior.
 - [x] Validate output paths are writable for JSON/SARIF flags.
 - [x] Validate rule paths/exclude lists reject invalid YAML types.
+- [x] JSON output uses lower camel case fields.
 
 ### 5.2 Integration + golden tests
 
@@ -242,6 +243,9 @@
 - 2026-03-04: `go test ./internal/config -run TestLoadRuleSetRejectsRulePathsNotList` - pass.
 - 2026-03-04: `go test ./cmd/regex-checker -run TestRunAnalyzeUsesTestdata` - pass.
 - 2026-03-04: `go test ./cmd/regex-checker` - pass.
+- 2026-03-04: `go test ./internal/output -run TestWriteJSON` - pass.
+- 2026-03-04: `go test ./internal/output -run TestGolden` - fail.
+- 2026-03-04: `UPDATE_GOLDEN=1 go test ./internal/output -run TestGolden` - pass.
 
 ## Summary
 
