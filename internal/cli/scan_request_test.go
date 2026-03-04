@@ -66,7 +66,53 @@ func TestBuildScanRequestUsesRuleSetDefaultsWithoutOverrides(t *testing.T) {
 	assertStringSlice(t, "default rule exclude", request.Rules[0].Exclude, expectedExclude)
 }
 
+func TestBuildScanRequestUsesRuleSetConcurrencyWhenNotSetInCLI(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Concurrency: intPtr(7),
+		Rules:       []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      2,
+		MaxFileSizeBytes: 10,
+		ConcurrencySet:   false,
+	}
+
+	request, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Concurrency != 7 {
+		t.Fatalf("expected concurrency 7, got %d", request.Concurrency)
+	}
+}
+
+func TestBuildScanRequestUsesCLIConcurrencyWhenSet(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Concurrency: intPtr(7),
+		Rules:       []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      3,
+		MaxFileSizeBytes: 10,
+		ConcurrencySet:   true,
+	}
+
+	request, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Concurrency != 3 {
+		t.Fatalf("expected concurrency 3, got %d", request.Concurrency)
+	}
+}
+
 func stringPtr(value string) *string {
+	return &value
+}
+
+func intPtr(value int) *int {
 	return &value
 }
 

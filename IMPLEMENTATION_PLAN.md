@@ -233,6 +233,8 @@
 - 2026-03-04: `go test ./internal/cli -run TestParseAnalyzeRejectsUnwritableOutJSON` - pass.
 - 2026-03-04: `go test ./internal/cli -run TestParseAnalyzeRejectsUnwritableOutSARIF` - pass.
 - 2026-03-04: `go test ./internal/cli` - pass.
+- 2026-03-04: `go test ./internal/cli -run TestBuildScanRequestUsesRuleSetConcurrencyWhenNotSetInCLI` - pass.
+- 2026-03-04: `go test ./internal/cli -run TestBuildScanRequestUsesCLIConcurrencyWhenSet` - pass.
 
 ## Summary
 

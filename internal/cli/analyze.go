@@ -38,6 +38,7 @@ type Config struct {
 	Include          []string
 	Exclude          []string
 	Concurrency      int
+	ConcurrencySet   bool
 	MaxFileSizeBytes int64
 	FailOnSeverity   string
 }
@@ -101,6 +102,9 @@ func ParseAnalyzeArgs(args []string) (Config, error) {
 
 	cfg.Include = include
 	cfg.Exclude = exclude
+	if wasFlagProvided(flagSet, "concurrency") {
+		cfg.ConcurrencySet = true
+	}
 
 	if flagSet.NArg() == 0 {
 		cfg.Roots = []string{"."}
@@ -297,46 +301,18 @@ func isValidSeverity(value string) bool {
 func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string) {
 	effective := ruleSet.ToRules()
 
-	if len(cfg.Include) > 0 {
-		effective.Include = append([]string{}, cfg.Include...)
-	}
-	if len(cfg.Exclude) > 0 {
-		effective.Exclude = append([]string{}, cfg.Exclude...)
-	}
-	if cfg.FailOnSeverity != "" {
-		effective.FailOn = &cfg.FailOnSeverity
-	}
-
-	effectiveRules := effective.Rules
-	if len(cfg.Include) > 0 || len(cfg.Exclude) > 0 {
-		effectiveRules = make([]rules.Rule, len(effective.Rules))
-		for i, rule := range effective.Rules {
-			copied := rule
-			if len(cfg.Include) > 0 {
-				copied.Paths = append([]string{}, effective.Include...)
-			}
-			if len(cfg.Exclude) > 0 {
-				copied.Exclude = append([]string{}, effective.Exclude...)
-			}
-			effectiveRules[i] = copied
-		}
-	}
+	applyRuleSetOverrides(cfg, &effective)
 
 	request := scan.Request{
 		Roots:            append([]string{}, cfg.Roots...),
-		Rules:            effectiveRules,
+		Rules:            buildEffectiveRules(cfg, effective),
 		Include:          append([]string{}, effective.Include...),
 		Exclude:          append([]string{}, effective.Exclude...),
 		MaxFileSizeBytes: cfg.MaxFileSizeBytes,
-		Concurrency:      cfg.Concurrency,
+		Concurrency:      resolveConcurrency(cfg, effective.Concurrency),
 	}
 
-	failOn := ""
-	if effective.FailOn != nil {
-		failOn = *effective.FailOn
-	}
-
-	return request, failOn
+	return request, resolveFailOn(effective.FailOn)
 }
 
 func writeError(out *bytes.Buffer, err error) {
@@ -478,4 +454,63 @@ func severityRank(value string) int {
 	default:
 		return severityRankUnknown
 	}
+}
+
+func applyRuleSetOverrides(cfg Config, effective *rules.RuleSet) {
+	if len(cfg.Include) > 0 {
+		effective.Include = append([]string{}, cfg.Include...)
+	}
+	if len(cfg.Exclude) > 0 {
+		effective.Exclude = append([]string{}, cfg.Exclude...)
+	}
+	if cfg.FailOnSeverity != "" {
+		effective.FailOn = &cfg.FailOnSeverity
+	}
+}
+
+func buildEffectiveRules(cfg Config, effective rules.RuleSet) []rules.Rule {
+	if len(cfg.Include) == 0 && len(cfg.Exclude) == 0 {
+		return effective.Rules
+	}
+
+	effectiveRules := make([]rules.Rule, len(effective.Rules))
+	for i, rule := range effective.Rules {
+		copied := rule
+		if len(cfg.Include) > 0 {
+			copied.Paths = append([]string{}, effective.Include...)
+		}
+		if len(cfg.Exclude) > 0 {
+			copied.Exclude = append([]string{}, effective.Exclude...)
+		}
+		effectiveRules[i] = copied
+	}
+
+	return effectiveRules
+}
+
+func resolveConcurrency(cfg Config, rulesetConcurrency *int) int {
+	if !cfg.ConcurrencySet && rulesetConcurrency != nil {
+		return *rulesetConcurrency
+	}
+
+	return cfg.Concurrency
+}
+
+func resolveFailOn(failOn *string) string {
+	if failOn == nil {
+		return ""
+	}
+
+	return *failOn
+}
+
+func wasFlagProvided(flagSet *flag.FlagSet, name string) bool {
+	found := false
+	flagSet.Visit(func(flagItem *flag.Flag) {
+		if flagItem.Name == name {
+			found = true
+		}
+	})
+
+	return found
 }
