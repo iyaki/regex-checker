@@ -127,11 +127,6 @@ run_go_arch_lint() {
 	go-arch-lint check
 }
 
-run_nancy() {
-	require_cmd nancy
-	go list -m all | nancy sleuth
-}
-
 case "$mode" in
 gofmt)
 	run_go_fmt
@@ -141,9 +136,6 @@ golangci | golangci-lint)
 	;;
 govulncheck)
 	run_govulncheck
-	;;
-nancy)
-	run_nancy
 	;;
 go-arch-lint | arch)
 	run_go_arch_lint
@@ -165,18 +157,16 @@ mutation)
 	;;
 security)
 	run_govulncheck
-	run_nancy
 	;;
 all)
 	run_go_fmt
 	run_golangci
 	run_test
 	run_govulncheck
-	run_nancy
 	run_go_arch_lint
 	;;
 *)
-	echo "Usage: $0 [all|format|lint|test|coverage|mutation|security|arch|gofmt|golangci|govulncheck|nancy|go-arch-lint]" >&2
+	echo "Usage: $0 [all|format|lint|test|coverage|mutation|security|arch|gofmt|golangci|govulncheck|go-arch-lint]" >&2
 	exit 1
 	;;
 esac

@@ -20,7 +20,7 @@
 
 - Go version: 1.25 (see `go.mod`).
 - Mutation testing tool: `go-mutesting`.
-- Lint and security via `golangci-lint`, `govulncheck`, `nancy`, `go-arch-lint`, `go-fmt`.
+- Lint and security via `golangci-lint`, `govulncheck`, `go-arch-lint`, `go-fmt`.
 
 ## Implementation Guidance
 

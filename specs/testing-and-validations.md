@@ -33,7 +33,6 @@
 
 - `golangci-lint` (lint aggregator)
 - `govulncheck` (Go vulnerability scanner)
-- `nancy` (dependency vulnerability scan)
 - `go-arch-lint` (architecture guardrails)
 - `gofmt` (formatting)
 - `go-mutesting` (mutation testing)
@@ -44,7 +43,6 @@
 ```bash
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.0
 go install golang.org/x/vuln/cmd/govulncheck@latest
-go install github.com/sonatype-nexus-community/nancy@latest
 go install github.com/fe3dback/go-arch-lint@latest
 go install github.com/avito-tech/go-mutesting/...
 go install github.com/evilmartians/lefthook/v2@v2.1.2
@@ -77,7 +75,6 @@ bash scripts/quality.sh arch
 bash scripts/quality.sh gofmt
 bash scripts/quality.sh golangci
 bash scripts/quality.sh govulncheck
-bash scripts/quality.sh nancy
 bash scripts/quality.sh go-arch-lint
 ```
 

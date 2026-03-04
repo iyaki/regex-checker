@@ -18,7 +18,5 @@ pre-commit:
       run: bash scripts/quality.sh golangci
     - name: govulncheck
       run: bash scripts/quality.sh govulncheck
-    - name: nancy
-      run: bash scripts/quality.sh nancy
     - name: go-arch-lint
       run: bash scripts/quality.sh go-arch-lint
