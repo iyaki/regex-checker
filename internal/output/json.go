@@ -66,7 +66,7 @@ func WriteJSON(result scan.Result, out io.Writer) error {
 
 func buildJSONMatches(matches []scan.Match) []jsonMatch {
 	if len(matches) == 0 {
-		return nil
+		return []jsonMatch{}
 	}
 
 	converted := make([]jsonMatch, len(matches))

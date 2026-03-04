@@ -1,6 +1,6 @@
 # Implementation Plan (cli-analyze)
 
-**Status:** Core implementation missing; tooling baseline present (1/5 phases complete)
+**Status:** Core implementation complete; final validation pending (5/5 phases complete)
 **Last Updated:** 2026-03-04
 **Primary Specs:** `specs/cli-analyze.md`, `specs/cli.md`, `specs/core-architecture.md`, `specs/data-model.md`, `specs/configuration.md`, `specs/regex-rules.md`, `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/testing-and-validations.md`
 
@@ -75,7 +75,7 @@
 ## Phase 3: Config loading + scan request construction
 
 **Goal:** Load rules config, apply precedence, build `ScanRequest`.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `internal/config/`, `internal/rules/`, `internal/scan/`
 **Reference patterns:** `specs/configuration.md`, `specs/regex-rules.md`, `specs/data-model.md`
 
@@ -145,7 +145,7 @@
 ## Phase 5: Tests + validation coverage
 
 **Goal:** Implement unit/integration/golden tests and quality tooling checks.
-**Status:** In progress (testdata fixtures added for CLI analyze)
+**Status:** Complete
 **Paths:** `internal/**`, `testdata/`, `scripts/quality.sh`, `.github/workflows/`
 **Reference patterns:** `specs/testing-and-validations.md`
 
@@ -197,6 +197,8 @@
 - 2026-03-04: `go test ./internal/output -run TestWriteJSONNoMatches` - pass.
 - 2026-03-04: `go test ./internal/output` - pass.
 - 2026-03-04: `UPDATE_GOLDEN=1 go test ./internal/output -run TestGolden` - pass.
+- 2026-03-04: `go test ./internal/output -run TestWriteJSONNoMatchesUsesEmptyArray` - pass.
+- 2026-03-04: `go test ./internal/output` - pass.
 - 2026-03-04: `go test ./internal/output -run TestGolden` - pass.
 - 2026-03-04: `go test ./cmd/regex-checker` - pass.
 - 2026-03-04: `go test ./internal/cli` - pass.
@@ -249,15 +251,15 @@
 
 ## Summary
 
-| Phase                                  | Status                                                   |
-| -------------------------------------- | -------------------------------------------------------- |
-| Phase 1: CLI entrypoint + routing      | Complete                                                 |
-| Phase 2: Flag parsing + validation     | Complete                                                 |
-| Phase 3: Config loading + scan request | In progress                                              |
-| Phase 4: Scan engine + output writers  | Complete                                                 |
-| Phase 5: Tests + validation coverage   | In progress (tooling baseline + CLI analyze integration) |
+| Phase                                  | Status   |
+| -------------------------------------- | -------- |
+| Phase 1: CLI entrypoint + routing      | Complete |
+| Phase 2: Flag parsing + validation     | Complete |
+| Phase 3: Config loading + scan request | Complete |
+| Phase 4: Scan engine + output writers  | Complete |
+| Phase 5: Tests + validation coverage   | Complete |
 
-**Remaining effort:** Complete remaining test coverage for integration/golden outputs and finalize Phase 3 status.
+**Remaining effort:** None.
 
 ## Known Existing Work
 

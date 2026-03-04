@@ -65,6 +65,34 @@ func TestWriteJSONNoMatches(t *testing.T) {
 	}
 }
 
+func TestWriteJSONNoMatchesUsesEmptyArray(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: nil,
+		Stats: scan.Stats{
+			FilesScanned: 0,
+			FilesSkipped: 0,
+			Matches:      0,
+			DurationMs:   0,
+		},
+	}
+
+	var buffer bytes.Buffer
+	if err := WriteJSON(result, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	raw := decodeRawJSON(t, buffer.Bytes())
+	matches, ok := raw["matches"].([]any)
+	if !ok {
+		t.Fatalf("expected matches array, got %T", raw["matches"])
+	}
+	if len(matches) != 0 {
+		t.Fatalf("expected no matches, got %d", len(matches))
+	}
+}
+
 func TestWriteJSONOrdersMatches(t *testing.T) {
 	t.Parallel()
 
