@@ -40,13 +40,16 @@ deps:
     mayDependOn:
       - rules
       - io
+    anyVendorDeps: true
   output:
     mayDependOn:
       - rules
       - scan
+    anyVendorDeps: true
   config:
     mayDependOn:
       - rules
+    anyVendorDeps: true
   rules:
     anyProjectDeps: true
     anyVendorDeps: false

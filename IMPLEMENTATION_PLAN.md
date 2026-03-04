@@ -123,13 +123,13 @@
 ### 4.3 JSON output
 
 - [x] Implement JSON formatter with `schemaVersion = 1` and stable ordering.
-- [ ] Write to stdout or `--out-json` per rules.
+- [x] Write to stdout or `--out-json` per rules.
 
 ### 4.4 SARIF output
 
-- [ ] Implement SARIF formatter using rule ids `RC0001`+.
-- [ ] Map severities and set `columnKind` to `unicodeCodePoints`.
-- [ ] Compute `endColumn` as exclusive with rune length of `matchText`.
+- [x] Implement SARIF formatter using rule ids `RC0001`+.
+- [x] Map severities and set `columnKind` to `unicodeCodePoints`.
+- [x] Compute `endColumn` as exclusive with rune length of `matchText`.
 
 **Definition of Done**
 
@@ -157,9 +157,9 @@
 
 ### 5.2 Integration + golden tests
 
-- [ ] CLI analyze happy path with fixture rules and sample files.
-- [ ] Exit code behavior for invalid config and `failOn` threshold.
-- [ ] JSON/SARIF output validation and deterministic ordering.
+- [x] CLI analyze happy path with fixture rules and sample files.
+- [x] Exit code behavior for invalid config and `failOn` threshold.
+- [x] JSON/SARIF output validation and deterministic ordering.
 - [ ] Golden snapshots for console/JSON/SARIF outputs.
 
 ### 5.3 Quality tooling baseline
@@ -185,6 +185,9 @@
 - 2026-03-04: `go test ./...` - pass.
 - 2026-03-04: `bash scripts/quality.sh coverage` - pass.
 - 2026-03-04: `go test ./internal/output -run TestWriteJSONNoMatches` - pass.
+- 2026-03-04: `go test ./internal/output` - pass.
+- 2026-03-04: `go test ./cmd/regex-checker` - pass.
+- 2026-03-04: `go test ./internal/cli` - pass.
 - 2026-03-04: `go test ./internal/output` - pass.
 - 2026-03-04: `go test ./internal/scan -run TestCollectFilesFiltersByIncludeExclude` - pass.
 - 2026-03-04: `go test ./internal/scan` - pass.
@@ -212,18 +215,19 @@
 - 2026-03-04: `go test ./internal/config -run TestRuleSetToRulesDefaultsConcurrency` - pass.
 - 2026-03-04: `go test ./internal/scan -run TestScanModelsHoldFields` - pass.
 - 2026-03-04: `go test ./internal/output` - pass.
+- 2026-03-04: `bash scripts/quality.sh all` - pass.
 
 ## Summary
 
-| Phase                                  | Status                                                  |
-| -------------------------------------- | ------------------------------------------------------- |
-| Phase 1: CLI entrypoint + routing      | Complete                                                |
-| Phase 2: Flag parsing + validation     | Complete                                                |
-| Phase 3: Config loading + scan request | In progress                                             |
-| Phase 4: Scan engine + output writers  | Not started                                             |
-| Phase 5: Tests + validation coverage   | Partially started (tooling baseline + CLI routing test) |
+| Phase                                  | Status                                                         |
+| -------------------------------------- | -------------------------------------------------------------- |
+| Phase 1: CLI entrypoint + routing      | Complete                                                       |
+| Phase 2: Flag parsing + validation     | Complete                                                       |
+| Phase 3: Config loading + scan request | In progress                                                    |
+| Phase 4: Scan engine + output writers  | In progress                                                    |
+| Phase 5: Tests + validation coverage   | Partially started (tooling baseline + CLI analyze integration) |
 
-**Remaining effort:** Phases 2-4 and core test coverage remain; CLI entrypoint routing is in place.
+**Remaining effort:** Complete remaining scan engine tests, golden outputs, and finalize Phase 3/4 status.
 
 ## Known Existing Work
 

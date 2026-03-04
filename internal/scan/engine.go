@@ -170,6 +170,7 @@ func scanEntries(entries []fileEntry, compiled []compiledRule) ([]Match, int, in
 					Line:      line,
 					Column:    column,
 					MatchText: captures[0],
+					RuleIndex: rule.rule.Index,
 				})
 			}
 		}
@@ -218,6 +219,9 @@ func compileRules(ruleList []rules.Rule, defaultInclude []string, defaultExclude
 		regex, err := regexp.Compile(rule.Regex)
 		if err != nil {
 			return nil, err
+		}
+		if rule.Index == 0 {
+			rule.Index = i
 		}
 		paths := normalizePatterns(rule.Paths)
 		if len(paths) == 0 {

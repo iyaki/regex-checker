@@ -1,18 +1,30 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/iyaki/regex-checker/internal/config"
+	"github.com/iyaki/regex-checker/internal/output"
+	"github.com/iyaki/regex-checker/internal/rules"
+	"github.com/iyaki/regex-checker/internal/scan"
 )
 
 const (
 	defaultConfigPath   = "regex-rules.yaml"
 	defaultFormat       = "console"
 	defaultMaxFileBytes = int64(5242880)
+)
+
+const (
+	exitCodeError   = 1
+	exitCodeFailOn  = 2
+	defaultFileMode = 0o600
 )
 
 // Config holds parsed analyze command inputs.
@@ -39,6 +51,28 @@ func (s *stringSlice) Set(value string) error {
 	*s = append(*s, value)
 
 	return nil
+}
+
+// HandleAnalyze executes the analyze command.
+func HandleAnalyze(args []string, out *bytes.Buffer) int {
+	result, failOn, formats, ruleset, cfg, err := runAnalyze(args)
+	if err != nil {
+		writeError(out, err)
+
+		return exitCodeError
+	}
+
+	if err := renderOutputs(formats, ruleset, cfg, result, out); err != nil {
+		writeError(out, err)
+
+		return exitCodeError
+	}
+
+	if failOn == "" {
+		return 0
+	}
+
+	return exitCodeForFailOn(result.Matches, failOn)
 }
 
 // ParseAnalyzeArgs parses analyze command arguments into a Config.
@@ -187,5 +221,192 @@ func isValidSeverity(value string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// BuildScanRequest resolves overrides and builds a scan request.
+func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string) {
+	effective := ruleSet.ToRules()
+
+	if len(cfg.Include) > 0 {
+		effective.Include = append([]string{}, cfg.Include...)
+	}
+	if len(cfg.Exclude) > 0 {
+		effective.Exclude = append([]string{}, cfg.Exclude...)
+	}
+	if cfg.FailOnSeverity != "" {
+		effective.FailOn = &cfg.FailOnSeverity
+	}
+
+	effectiveRules := effective.Rules
+	if len(cfg.Include) > 0 || len(cfg.Exclude) > 0 {
+		effectiveRules = make([]rules.Rule, len(effective.Rules))
+		for i, rule := range effective.Rules {
+			copied := rule
+			if len(cfg.Include) > 0 {
+				copied.Paths = append([]string{}, effective.Include...)
+			}
+			if len(cfg.Exclude) > 0 {
+				copied.Exclude = append([]string{}, effective.Exclude...)
+			}
+			effectiveRules[i] = copied
+		}
+	}
+
+	request := scan.Request{
+		Roots:            append([]string{}, cfg.Roots...),
+		Rules:            effectiveRules,
+		Include:          append([]string{}, effective.Include...),
+		Exclude:          append([]string{}, effective.Exclude...),
+		MaxFileSizeBytes: cfg.MaxFileSizeBytes,
+		Concurrency:      cfg.Concurrency,
+	}
+
+	failOn := ""
+	if effective.FailOn != nil {
+		failOn = *effective.FailOn
+	}
+
+	return request, failOn
+}
+
+func writeError(out *bytes.Buffer, err error) {
+	_, _ = fmt.Fprintf(out, "%s\n", err.Error())
+}
+
+func runAnalyze(args []string) (scan.Result, string, []string, []rules.Rule, Config, error) {
+	cfg, err := ParseAnalyzeArgs(args)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, err
+	}
+
+	ruleSet, err := config.LoadRuleSet(cfg.ConfigPath)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, err
+	}
+
+	request, failOn := BuildScanRequest(cfg, ruleSet)
+	result, err := scan.Run(request)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, err
+	}
+
+	return result, failOn, cfg.Formats, request.Rules, cfg, nil
+}
+
+func renderOutputs(formats []string, ruleset []rules.Rule, cfg Config, result scan.Result, out *bytes.Buffer) error {
+	for _, format := range formats {
+		switch format {
+		case "console":
+			if err := output.WriteConsole(result, out); err != nil {
+				return err
+			}
+		case "json":
+			if err := writeJSONOutput(cfg, result, out); err != nil {
+				return err
+			}
+		case "sarif":
+			if err := writeSARIFOutput(cfg, result, ruleset, out); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid format: %s", format)
+		}
+	}
+
+	return nil
+}
+
+func writeJSONOutput(cfg Config, result scan.Result, out *bytes.Buffer) error {
+	if cfg.OutJSON == "" {
+		if len(cfg.Formats) != 1 {
+			return errors.New("--out-json is required when requesting json with multiple formats")
+		}
+
+		return output.WriteJSON(result, out)
+	}
+
+	return writeJSONFile(cfg.OutJSON, result)
+}
+
+func writeSARIFOutput(cfg Config, result scan.Result, ruleset []rules.Rule, out *bytes.Buffer) error {
+	if cfg.OutSARIF == "" {
+		if len(cfg.Formats) != 1 {
+			return errors.New("--out-sarif is required when requesting sarif with multiple formats")
+		}
+
+		return output.WriteSARIF(result, ruleset, out)
+	}
+
+	return writeSARIFFile(cfg.OutSARIF, result, ruleset)
+}
+
+func writeJSONFile(path string, result scan.Result) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, defaultFileMode)
+	if err != nil {
+		return err
+	}
+	if err := output.WriteJSON(result, file); err != nil {
+		_ = file.Close()
+
+		return err
+	}
+
+	return file.Close()
+}
+
+func writeSARIFFile(path string, result scan.Result, ruleSet []rules.Rule) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, defaultFileMode)
+	if err != nil {
+		return err
+	}
+	if err := output.WriteSARIF(result, ruleSet, file); err != nil {
+		_ = file.Close()
+
+		return err
+	}
+
+	return file.Close()
+}
+
+func hasFailingMatch(matches []scan.Match, failOn string) bool {
+	threshold := severityRank(failOn)
+	for _, match := range matches {
+		if severityRank(match.Severity) <= threshold {
+			return true
+		}
+	}
+
+	return false
+}
+
+func exitCodeForFailOn(matches []scan.Match, failOn string) int {
+	if hasFailingMatch(matches, failOn) {
+		return exitCodeFailOn
+	}
+
+	return 0
+}
+
+const (
+	severityRankError = iota
+	severityRankWarning
+	severityRankNotice
+	severityRankInfo
+	severityRankUnknown
+)
+
+func severityRank(value string) int {
+	switch value {
+	case "error":
+		return severityRankError
+	case "warning":
+		return severityRankWarning
+	case "notice":
+		return severityRankNotice
+	case "info":
+		return severityRankInfo
+	default:
+		return severityRankUnknown
 	}
 }

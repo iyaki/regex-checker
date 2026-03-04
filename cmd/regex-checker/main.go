@@ -20,7 +20,9 @@ func main() {
 }
 
 func run(args []string, out io.Writer) int {
-	handlers := map[string]cli.Handler{}
+	handlers := map[string]cli.Handler{
+		"analyze": cli.HandleAnalyze,
+	}
 
 	return cli.Run(args, handlers, out)
 }
