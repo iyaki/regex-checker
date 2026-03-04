@@ -115,6 +115,7 @@
 - [x] Capture matches with 1-based line/column rune indices.
 - [x] Add scan result data models (`Match`, `ScanStats`, `ScanResult`) in `internal/scan`.
 - [x] Aggregate `ScanResult` with deterministic ordering.
+- [x] Treat file read errors as skipped files while continuing scan.
 
 ### 4.2 Console output
 
@@ -188,6 +189,7 @@
 - 2026-03-04: `go test ./internal/scan -run TestRunCapturesRuneLineAndColumn` - pass.
 - 2026-03-04: `go test ./internal/scan` - pass.
 - 2026-03-04: `go test ./internal/scan -run TestRunUsesConcurrencyForFileReads` - pass.
+- 2026-03-04: `go test ./internal/scan -run TestEvaluateFileSkipsOnUnreadableFile` - pass.
 - 2026-03-04: `go test ./...` - pass.
 - 2026-03-04: `bash scripts/quality.sh coverage` - pass.
 - 2026-03-04: `go test ./internal/output -run TestWriteJSONNoMatches` - pass.

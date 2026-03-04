@@ -564,17 +564,17 @@ func shouldSkipFile(path string, entry os.DirEntry, maxFileSizeBytes int64) (boo
 
 	file, err := os.Open(path)
 	if err != nil {
-		return false, err
+		return true, nil
 	}
 
 	buffer := make([]byte, binaryProbeSize)
 	read, readErr := file.Read(buffer)
 	closeErr := file.Close()
 	if closeErr != nil {
-		return false, closeErr
+		return true, nil
 	}
 	if readErr != nil && !errors.Is(readErr, io.EOF) {
-		return false, readErr
+		return true, nil
 	}
 	for _, value := range buffer[:read] {
 		if value == nullByte {

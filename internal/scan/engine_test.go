@@ -2,6 +2,7 @@
 package scan
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -529,6 +530,33 @@ func TestCollectFileEntrySkipsNonMatchingInclude(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("expected no entries, got %d", len(entries))
+	}
+}
+
+func TestEvaluateFileSkipsOnUnreadableFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "sample.txt")
+	writeFileWithContent(t, path, "content")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("failed to stat file: %v", err)
+	}
+	entry := fs.FileInfoToDirEntry(info)
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("failed to remove file: %v", err)
+	}
+
+	selected, skipped, err := evaluateFile(path, "sample.txt", entry, []string{"**/*"}, nil, 1024)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected {
+		t.Fatal("expected file to be unselected")
+	}
+	if !skipped {
+		t.Fatal("expected file to be skipped")
 	}
 }
 
