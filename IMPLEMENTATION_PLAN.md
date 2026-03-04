@@ -149,7 +149,7 @@
 
 ### 5.1 Unit tests
 
-- [ ] Config loader defaulting and validation.
+- [x] Config loader defaulting and validation.
 - [x] Rule compiler regex compilation and message interpolation.
 - [x] Path filtering include/exclude behavior.
 - [ ] Scan engine line/column mapping and match aggregation.
@@ -209,6 +209,8 @@
 - 2026-03-04: `go test ./internal/cli` - pass (added analyze routing coverage).
 - 2026-03-04: `go test ./...` - pass.
 - 2026-03-04: `bash scripts/quality.sh all` - pass.
+- 2026-03-04: `go test ./internal/config -run TestLoadRuleSetRejectsIncludeNotList` - pass.
+- 2026-03-04: `go test ./internal/config` - pass.
 - 2026-03-04: `go test ./internal/cli` - pass.
 - 2026-03-04: `bash scripts/quality.sh all` - pass.
 - 2026-03-04: `go test ./internal/config` - pass.

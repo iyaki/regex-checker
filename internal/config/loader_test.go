@@ -34,6 +34,50 @@ func TestLoadRuleSetRejectsInvalidYAML(t *testing.T) {
 	}
 }
 
+func TestLoadRuleSetRejectsIncludeNotList(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "include: 'src/**'\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	_, err := config.LoadRuleSet(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestLoadRuleSetRejectsExcludeNotList(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "exclude: 'vendor/**'\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	_, err := config.LoadRuleSet(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestLoadRuleSetRejectsIncludeNonStringItems(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "include:\n  - 1\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	_, err := config.LoadRuleSet(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestLoadRuleSetRejectsExcludeNonStringItems(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "exclude:\n  - true\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	_, err := config.LoadRuleSet(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func TestLoadRuleSetParsesConfig(t *testing.T) {
 	t.Parallel()
 
@@ -154,8 +198,8 @@ func TestRuleSetToRulesCopiesSlices(t *testing.T) {
 	t.Parallel()
 
 	ruleSet := config.RuleSet{
-		Include: []string{"src/**"},
-		Exclude: []string{"vendor/**"},
+		Include: config.StringList{"src/**"},
+		Exclude: config.StringList{"vendor/**"},
 		Rules: []config.Rule{
 			{
 				Message:  "hello",
