@@ -156,6 +156,7 @@
 - [x] Scan engine line/column mapping and match aggregation.
 - [x] CLI routing for `analyze` command.
 - [x] Init command parsing and overwrite behavior.
+- [x] Validate output paths are writable for JSON/SARIF flags.
 
 ### 5.2 Integration + golden tests
 
@@ -227,6 +228,9 @@
 - 2026-03-04: `go test ./internal/cli -run TestParseInitDefaults` - pass.
 - 2026-03-04: `go test ./internal/cli -run TestHandleInit` - pass.
 - 2026-03-04: `go test ./cmd/regex-checker -run TestRunRoutesInit` - pass.
+- 2026-03-04: `go test ./internal/cli -run TestParseAnalyzeRejectsUnwritableOutJSON` - pass.
+- 2026-03-04: `go test ./internal/cli -run TestParseAnalyzeRejectsUnwritableOutSARIF` - pass.
+- 2026-03-04: `go test ./internal/cli` - pass.
 
 ## Summary
 

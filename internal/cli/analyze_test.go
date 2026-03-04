@@ -189,6 +189,140 @@ func TestParseAnalyzeRejectsZeroMaxFileSize(t *testing.T) {
 	}
 }
 
+func TestParseAnalyzeRejectsUnwritableOutJSON(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputDir := readOnlyDir(t)
+	outputPath := filepath.Join(outputDir, "scan.json")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeRejectsUnwritableOutSARIF(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputDir := readOnlyDir(t)
+	outputPath := filepath.Join(outputDir, "scan.sarif")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "sarif", "--out-sarif", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeAllowsWritableOutJSONFile(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := writableFile(t, "scan.json")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestParseAnalyzeRejectsReadOnlyOutJSONFile(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := readOnlyFile(t, "scan.json")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeRejectsOutJSONWithMissingParent(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := filepath.Join(t.TempDir(), "missing", "scan.json")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeRejectsOutJSONDirectory(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := t.TempDir()
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeAllowsWritableOutSARIFFile(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := writableFile(t, "scan.sarif")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "sarif", "--out-sarif", outputPath})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestParseAnalyzeRejectsOutSARIFDirectory(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := t.TempDir()
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "sarif", "--out-sarif", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeAllowsNewOutJSONInWritableDir(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := filepath.Join(t.TempDir(), "new.json")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestParseAnalyzeAllowsNewOutSARIFInWritableDir(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := filepath.Join(t.TempDir(), "new.sarif")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "sarif", "--out-sarif", outputPath})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestParseAnalyzeRejectsReadOnlyOutSARIFFile(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+	outputPath := readOnlyFile(t, "scan.sarif")
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "sarif", "--out-sarif", outputPath})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func writeTempConfig(t *testing.T) string {
 	t.Helper()
 
@@ -197,6 +331,48 @@ func writeTempConfig(t *testing.T) string {
 	if err := os.WriteFile(path, []byte("rules: []"), 0o600); err != nil {
 		t.Fatalf("failed to write temp config: %v", err)
 	}
+
+	return path
+}
+
+func readOnlyDir(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("failed to set read-only permissions: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+	})
+
+	return dir
+}
+
+func writableFile(t *testing.T, name string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	return path
+}
+
+func readOnlyFile(t *testing.T, name string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+	if err := os.Chmod(path, 0o400); err != nil {
+		t.Fatalf("failed to set read-only permissions: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(path, 0o600)
+	})
 
 	return path
 }

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -196,7 +197,7 @@ func validateConfigPath(path string) error {
 
 func validateOutputPaths(cfg Config) error {
 	if len(cfg.Formats) <= 1 {
-		return nil
+		return validateOutputPathValues(cfg)
 	}
 
 	for _, format := range cfg.Formats {
@@ -210,6 +211,74 @@ func validateOutputPaths(cfg Config) error {
 				return errors.New("--out-sarif is required when requesting sarif with multiple formats")
 			}
 		}
+	}
+
+	return validateOutputPathValues(cfg)
+}
+
+func validateOutputPathValues(cfg Config) error {
+	if cfg.OutJSON != "" {
+		if err := validateOutputPath(cfg.OutJSON); err != nil {
+			return err
+		}
+	}
+	if cfg.OutSARIF != "" {
+		if err := validateOutputPath(cfg.OutSARIF); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateOutputPath(path string) error {
+	info, err := os.Stat(path)
+	if err == nil {
+		return validateExistingOutputPath(info, path)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("output path not writable: %s", path)
+	}
+
+	parent := filepath.Dir(path)
+	if parent == "." || parent == "" {
+		parent = "."
+	}
+	if _, err := os.Stat(parent); err != nil {
+		return fmt.Errorf("output path not writable: %s", path)
+	}
+
+	return validateOutputDirectoryWritable(parent, path)
+}
+
+func validateExistingOutputPath(info os.FileInfo, path string) error {
+	if info.IsDir() {
+		return fmt.Errorf("output path is a directory: %s", path)
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY, defaultFileMode)
+	if err != nil {
+		return fmt.Errorf("output path not writable: %s", path)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("output path not writable: %s", path)
+	}
+
+	return nil
+}
+
+func validateOutputDirectoryWritable(parent, path string) error {
+	probe, err := os.CreateTemp(parent, ".regex-checker-*")
+	if err != nil {
+		return fmt.Errorf("output path not writable: %s", path)
+	}
+	name := probe.Name()
+	if err := probe.Close(); err != nil {
+		_ = os.Remove(name)
+
+		return fmt.Errorf("output path not writable: %s", path)
+	}
+	if err := os.Remove(name); err != nil {
+		return fmt.Errorf("output path not writable: %s", path)
 	}
 
 	return nil
