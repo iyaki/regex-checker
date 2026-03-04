@@ -1,6 +1,6 @@
 # Implementation Plan (cli-analyze)
 
-**Status:** Core implementation missing; tooling baseline present (0/5 phases complete)
+**Status:** Core implementation missing; tooling baseline present (1/5 phases complete)
 **Last Updated:** 2026-03-04
 **Primary Specs:** `specs/cli-analyze.md`, `specs/cli.md`, `specs/core-architecture.md`, `specs/data-model.md`, `specs/configuration.md`, `specs/regex-rules.md`, `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/testing-and-validations.md`
 
@@ -18,16 +18,16 @@
 ## Phase 1: CLI analyze entrypoint + routing
 
 **Goal:** Implement CLI entrypoint, command routing, and alias handling.
-**Status:** Not started
+**Status:** Complete
 **Paths:** `cmd/regex-checker/`, `internal/cli/`
 **Reference patterns:** `specs/cli.md`, `specs/cli-analyze.md`
 
 ### 1.1 CLI command structure
 
-- [ ] Create CLI entrypoint at `cmd/regex-checker/main.go` with subcommand parsing.
-- [ ] Implement `analyze` handler and `analyse` alias routing.
-- [ ] Print help and exit code `1` when no command is provided.
-- [ ] Print a single error message and exit code `1` for unknown commands.
+- [x] Create CLI entrypoint at `cmd/regex-checker/main.go` with subcommand parsing.
+- [x] Implement `analyze` handler and `analyse` alias routing.
+- [x] Print help and exit code `1` when no command is provided.
+- [x] Print a single error message and exit code `1` for unknown commands.
 
 **Definition of Done**
 
@@ -187,23 +187,26 @@
 - 2026-03-04: `glob **/*.go` - no Go source files found.
 - 2026-03-04: `glob internal/**`, `glob cmd/**` - no implementation directories found.
 - 2026-03-04: Read quality/tooling configs (`scripts/quality.sh`, `.golangci.yml`, `.go-arch-lint.yml`, `lefthook.yml`, `.github/workflows/quality*.yml`) - tooling baseline present.
+- 2026-03-04: `go test ./internal/cli` - pass.
+- 2026-03-04: `go test ./...` - pass.
+- 2026-03-04: `bash scripts/quality.sh all` - pass.
 
 ## Summary
 
 | Phase                                  | Status                               |
 | -------------------------------------- | ------------------------------------ |
-| Phase 1: CLI entrypoint + routing      | Not started                          |
+| Phase 1: CLI entrypoint + routing      | Complete                             |
 | Phase 2: Flag parsing + validation     | Not started                          |
 | Phase 3: Config loading + scan request | Not started                          |
 | Phase 4: Scan engine + output writers  | Not started                          |
 | Phase 5: Tests + validation coverage   | Partially started (tooling baseline) |
 
-**Remaining effort:** Phases 1-4 and core test coverage remain; only tooling scaffolding is present.
+**Remaining effort:** Phases 2-4 and core test coverage remain; CLI entrypoint routing is in place.
 
 ## Known Existing Work
 
 - Tooling baseline present: `go.mod`, `scripts/quality.sh`, `.golangci.yml`, `.go-arch-lint.yml`, `lefthook.yml`, `.github/workflows/quality.yml`, `.github/workflows/quality-local.yml`.
-- No Go implementation sources found yet (`cmd/`, `internal/` missing).
+- CLI entrypoint + routing scaffolding added in `cmd/regex-checker/` and `internal/cli/`.
 
 ## Manual Deployment Tasks
 

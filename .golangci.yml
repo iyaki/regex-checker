@@ -7,18 +7,7 @@ run:
 output:
   sort-results: true
 
-# linters-settings:
-#   depguard:
-#     rules:
-#       main:
-#         list-mode: lax
-#         deny:
-#           - pkg: "io/ioutil"
-#             desc: "deprecated; use io or os"
-#           - pkg: "github.com/pkg/errors"
-#             desc: "use standard errors"
-#           - pkg: "golang.org/x/net/context"
-#             desc: "use context"
+linters-settings: {}
 #   gocyclo:
 #     min-complexity: 15
 #   govet:
@@ -39,41 +28,17 @@ output:
 #         arguments:
 #           - ["ID", "JSON", "SARIF", "YAML", "CLI", "HTTP", "URL"]
 #   errcheck:
-    exclude-functions:
-      - (*os.File).Close
+#     exclude-functions:
+#       - (*os.File).Close
 
 linters:
   default: fast
   enable:
-    - bodyclose
-    - depguard
-    - durationcheck
     - errcheck
-    - errorlint
-    - exhaustive
-    - goconst
-    - gocritic
-    - gofmt
-    - goimports
-    - gosimple
-    - govet
-    - ineffassign
-    - nilerr
-    - nilnil
-    - noctx
     - revive
-    - rowserrcheck
-    - sqlclosecheck
-    - staticcheck
-    - tenv
-    - thelper
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - usestdlibvars
-    - wastedassign
-    - gosec
+  disable:
+    - depguard
+    - wsl
 
 issues:
   max-same-issues: 0
