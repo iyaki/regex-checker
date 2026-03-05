@@ -1,6 +1,6 @@
 # SARIF Formatter
 
-Status: Proposed
+Status: Implemented
 
 ## Overview
 

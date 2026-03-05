@@ -1,6 +1,6 @@
 # Regex Rules
 
-Status: Proposed
+Status: Implemented
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # Regex Checker CLI
 
-Status: Proposed
+Status: Implemented
 
 ## Overview
 

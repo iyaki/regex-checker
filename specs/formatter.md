@@ -1,6 +1,6 @@
 # Formatter Core
 
-Status: Proposed
+Status: Partial
 
 ## Overview
 
