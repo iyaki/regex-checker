@@ -8,6 +8,7 @@ Status: Proposed
 
 - Provide human-readable scan results on stdout for local usage.
 - Keep output stable and grep-friendly across platforms.
+- Follow shared formatter guidelines in `specs/formatter.md`.
 
 ### Goals
 
@@ -46,8 +47,8 @@ internal/
 
 1. Receive `ScanResult` from the scan service.
 2. Sort matches deterministically (see Ordering).
-3. Group matches by `filePath`.
-4. Render each file section and its matches.
+3. Group matches by relative `filePath`.
+4. Render each match as a two-line block.
 5. Render the summary line.
 
 ## Data model
@@ -58,12 +59,12 @@ ConsoleMatchLine
 
 - Definition: A rendered line for a single match.
 - Fields:
-  - `filePath` (string): Relative file path used in the header.
+  - `filePath` (string): Relative file path used for ordering.
   - `severityLabel` (string): One of `ERROR|WARN|NOTICE|INFO`.
   - `line` (int): 1-based line number.
   - `column` (int): 1-based column number (rune index).
   - `message` (string): Interpolated match message.
-  - `fileUri` (string): Absolute file URI suffix in the format `file://<abs-path>:<line>`.
+  - `absolutePath` (string): Absolute file path printed on the line below the finding as `<absolutePath>:<line>`.
 
 ConsoleSummary
 
@@ -89,8 +90,10 @@ ConsoleSummary
 
 1. Sort matches (Ordering).
 2. For each `filePath`, print the file header line.
-3. For each match in that file, print a match line with the `fileUri` suffix.
-4. After all files, print the summary line.
+3. For each match, print a bullet-prefixed finding line.
+4. Print the absolute path line with `:<line>` on the next line.
+5. Print a blank line between findings.
+6. After all findings, print the summary line.
 
 ### No matches
 
@@ -119,21 +122,18 @@ ConsoleSummary
 
 - Output contains interpolated messages that may include sensitive data.
 - Do not emit raw `matchText` in console output.
-- Output includes absolute file URIs, which may reveal local filesystem layout.
+- Output includes absolute file paths, which may reveal local filesystem layout.
 
 ## Dependencies
 
 - Standard library only.
-
-## Open Questions / Risks
-
-- None.
 
 ## Verifications
 
 - Console output is deterministic across runs with identical inputs.
 - `No matches found.` appears when `matches == 0`.
 - Summary line includes files scanned, skipped, total matches, and duration.
+- During tests/QA, validate that every `absolutePath` refers to an existing file; the CLI does not validate at runtime.
 
 ## Appendices
 
@@ -147,19 +147,14 @@ ConsoleSummary
 ### Output format
 
 ```
-path/to/file.ext
-  ERROR 12:5 Avoid hardcoded token: abc123 file:///abs/path/to/file.ext:12
-  WARN  42:1 Unexpected debug flag file:///abs/path/to/file.ext:42
+- ERROR 12:5 Avoid hardcoded token: abc123
+  /abs/path/to/file.ext:12
 
-another/file.go
-  NOTICE 3:9 Use of TODO comment file:///abs/another/file.go:3
+- WARN  42:1 Unexpected debug flag
+  /abs/path/to/file.ext:42
+
+- NOTICE 3:9 Use of TODO comment
+  /abs/another/file.go:3
 
 Summary: files=10 skipped=1 matches=3 durationMs=120
 ```
-
-### File URI format
-
-- Scheme is fixed to `file` (no configuration).
-- Path is absolute and URL-encoded (spaces become `%20`).
-- The line number is appended as `:<line>` (no column).
-- Windows drive letters use a leading slash (example: `file:///C:/path/to/file.go:12`).

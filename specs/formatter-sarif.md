@@ -8,6 +8,7 @@ Status: Proposed
 
 - Provide SARIF 2.1.0 output for CI and code scanning systems.
 - Preserve rule metadata and locations in SARIF-compliant structures.
+- Follow shared formatter guidelines in `specs/formatter.md`.
 
 ### Goals
 
@@ -164,10 +165,6 @@ SarifLocation
 ## Dependencies
 
 - `github.com/owenrumney/go-sarif/v2/sarif` for SARIF generation.
-
-## Open Questions / Risks
-
-- None.
 
 ## Verifications
 

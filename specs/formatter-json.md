@@ -8,6 +8,7 @@ Status: Proposed
 
 - Provide machine-readable scan results for CI and automation.
 - Preserve full match detail and scan stats.
+- Follow shared formatter guidelines in `specs/formatter.md`.
 
 ### Goals
 
@@ -67,7 +68,7 @@ JSONMatch
   - `message` (string, required)
   - `severity` (string, required): `error|warning|notice|info`
   - `filePath` (string, required)
-  - `fileUri` (string, required): Absolute file URI in the format `file://<abs-path>:<line>`.
+  - `absolutePath` (string, required): Absolute file path with `:<line>` appended.
   - `line` (int, required, 1-based)
   - `column` (int, required, 1-based, rune index)
   - `matchText` (string, required): Full matched substring (`$0`).
@@ -132,7 +133,7 @@ JSONStats
 ## Security Considerations
 
 - JSON includes `matchText`, which may contain sensitive data.
-- JSON includes absolute file URIs, which may reveal local filesystem layout.
+- JSON includes absolute file paths, which may reveal local filesystem layout.
 - If output is written to disk, follow least-privilege filesystem permissions.
 
 ## Dependencies
@@ -144,6 +145,7 @@ JSONStats
 - JSON validates against the schema described in this spec.
 - Ordering is deterministic across runs with identical inputs.
 - When `--format` includes `json` with another formatter and `--out-json` is missing, the command fails.
+- During tests/QA, validate that every `absolutePath` refers to an existing file; the CLI does not validate at runtime.
 
 ## Appendices
 
@@ -164,7 +166,7 @@ JSONStats
 			"message": "Avoid hardcoded token: abc123",
 			"severity": "error",
 			"filePath": "src/auth/token.go",
-			"fileUri": "file:///abs/src/auth/token.go:12",
+			"absolutePath": "/abs/src/auth/token.go:12",
 			"line": 12,
 			"column": 5,
 			"matchText": "token=abc123"
@@ -178,10 +180,3 @@ JSONStats
 	}
 }
 ```
-
-### File URI format
-
-- Scheme is fixed to `file` (no configuration).
-- Path is absolute and URL-encoded (spaces become `%20`).
-- The line number is appended as `:<line>` (no column).
-- Windows drive letters use a leading slash (example: `file:///C:/path/to/file.go:12`).

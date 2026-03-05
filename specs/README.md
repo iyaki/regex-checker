@@ -27,6 +27,7 @@ Design docs and technical specifications
 
 ### Formatters
 
+- [Formatter Core](specs/formatter.md)
 - [Console Formatter](specs/formatter-console.md)
 - [JSON Formatter](specs/formatter-json.md)
 - [SARIF Formatter](specs/formatter-sarif.md)
