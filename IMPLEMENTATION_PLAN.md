@@ -1,270 +1,132 @@
-# Implementation Plan (cli-analyze)
+# Implementation Plan (formatter)
 
-**Status:** Core implementation complete; final validation pending (5/5 phases complete)
-**Last Updated:** 2026-03-04
-**Primary Specs:** `specs/cli-analyze.md`, `specs/cli.md`, `specs/core-architecture.md`, `specs/data-model.md`, `specs/configuration.md`, `specs/regex-rules.md`, `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/testing-and-validations.md`
+**Status:** Formatter scope partially complete (Console/JSON missing file URIs; SARIF complete)
+**Last Updated:** 2026-03-05
+**Primary Specs:** `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/data-model.md`, `specs/testing-and-validations.md`
 
 ## Quick Reference
 
-| System / Subsystem     | Specs                                                                               | Modules / Packages                                     | Web Packages | Migrations / Artifacts                                                                  |
-| ---------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------- |
-| CLI analyze command    | `specs/cli-analyze.md`, `specs/cli.md`                                              | `cmd/regex-checker/main.go`, `internal/cli/analyze.go` | N/A          | N/A                                                                                     |
-| Config + rules loading | `specs/configuration.md`, `specs/regex-rules.md`                                    | `internal/config/`, `internal/rules/`                  | N/A          | N/A                                                                                     |
-| Scan engine + service  | `specs/core-architecture.md`, `specs/data-model.md`                                 | `internal/scan/`, `internal/io/`                       | N/A          | N/A                                                                                     |
-| Output formatters      | `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/output/`                                     | N/A          | N/A                                                                                     |
-| Tooling baseline       | `specs/testing-and-validations.md`                                                  | N/A                                                    | N/A          | ✅ `go.mod`, `scripts/quality.sh`, `lefthook.yml`, `.golangci.yml`, `.go-arch-lint.yml` |
-| Testing + validation   | `specs/testing-and-validations.md`                                                  | `internal/**`, `testdata/`                             | N/A          | ✅ `.github/workflows/quality.yml`, `.github/workflows/quality-local.yml`               |
+| System / Subsystem           | Specs                                                                                                 | Modules / Packages                                            | Web Packages | Migrations / Artifacts |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------ | ---------------------- |
+| Console formatter            | `specs/formatter-console.md`                                                                          | ✅ `internal/output/console.go`                               | N/A          | N/A                    |
+| JSON formatter               | `specs/formatter-json.md`                                                                             | ✅ `internal/output/json.go`                                  | N/A          | N/A                    |
+| SARIF formatter              | `specs/formatter-sarif.md`                                                                            | ✅ `internal/output/sarif.go`                                 | N/A          | N/A                    |
+| Formatter tests + golden     | `specs/testing-and-validations.md`                                                                    | ✅ `internal/output/*_test.go`                                | N/A          | ✅ `testdata/golden/*` |
+| Formatter data model link    | `specs/data-model.md`                                                                                 | ✅ `internal/scan/model.go`                                   | N/A          | N/A                    |
+| CLI output wiring (relation) | `specs/cli-analyze.md`, `specs/cli.md`                                                                | ✅ `internal/cli/analyze.go`, `internal/cli/cli.go`           | N/A          | N/A                    |
+| Scan engine data source      | `specs/core-architecture.md`, `specs/regex-rules.md`, `specs/configuration.md`, `specs/data-model.md` | ✅ `internal/scan/*`, `internal/rules/*`, `internal/config/*` | N/A          | N/A                    |
 
-## Phase 1: CLI analyze entrypoint + routing
+## Phase 1: Console formatter
 
-**Goal:** Implement CLI entrypoint, command routing, and alias handling.
-**Status:** Complete
-**Paths:** `cmd/regex-checker/`, `internal/cli/`
-**Reference patterns:** `specs/cli.md`, `specs/cli-analyze.md`
+**Goal:** Provide deterministic console output grouped by file with summary line.
+**Status:** Partial
+**Paths:** `internal/output/console.go`, `internal/output/console_test.go`, `testdata/golden/console.txt`
+**Reference patterns:** `specs/formatter-console.md`
 
-### 1.1 CLI command structure
+### 1.1 Console output structure
 
-- [x] Create CLI entrypoint at `cmd/regex-checker/main.go` with subcommand parsing.
-- [x] Implement `analyze` handler and `analyse` alias routing.
-- [x] Print help and exit code `1` when no command is provided.
-- [x] Print a single error message and exit code `1` for unknown commands.
-- [x] Implement `init` handler and route from CLI.
+- [x] Sort matches deterministically by file path, line, column, severity, message.
+- [x] Group matches by file and render a summary line.
+- [x] Print `No matches found.` when there are zero matches.
+- [x] Render file URI suffix (`file://<abs-path>:<line>`) per match line.
+- [x] URL-encode file URI paths and handle Windows drive letter format.
+- [x] Avoid emitting raw `matchText` in console output.
 
-**Definition of Done**
+### 1.2 File URI generation (shared helper)
 
-- `regex-checker analyze` and `regex-checker analyse` route to the same handler.
-- Help/unknown command behaviors align with `specs/cli.md`.
-
-**Risks/Dependencies**
-
-- Requires structure alignment with core packages from `specs/core-architecture.md`.
-
-## Phase 2: Analyze flag parsing + validation
-
-**Goal:** Parse analyze flags, validate inputs, and map to `CLIConfig`.
-**Status:** Complete
-**Paths:** `internal/cli/analyze.go`
-**Reference patterns:** `specs/cli-analyze.md`
-
-### 2.1 Flag parsing + defaults
-
-- [x] Parse flags: `--config`, `--format`, `--out-json`, `--out-sarif`, `--include`, `--exclude`, `--concurrency`, `--max-file-size`, `--fail-on`.
-- [x] Default roots to `.` when no positional paths are provided.
-- [x] Default `--config` to `regex-rules.yaml` in CWD.
-- [x] Default formats to `console`.
-- [x] Default `--concurrency` to `GOMAXPROCS` and `--max-file-size` to `5242880`.
-
-### 2.2 Validation rules
-
-- [x] Validate `--config` file existence and readability.
-- [x] Validate `--format` values (`console|json|sarif`) and de-duplicate.
-- [x] Validate `--concurrency` and `--max-file-size` are positive integers.
-- [x] Validate `--fail-on` values (`error|warning|notice|info`).
-- [x] Enforce output path requirements for multi-format output.
-- [x] Enforce stdout behavior when only JSON or SARIF requested without output path.
+- [x] Add shared helper for absolute, URL-encoded file URIs with line suffix.
+- [x] Ensure Windows drive letters render as `file:///C:/...:line`.
+- [x] Reuse helper in console formatter.
 
 **Definition of Done**
 
-- `CLIConfig` fully maps to `ScanRequest` inputs and output requirements.
-- Validation errors return exit code `1` with a single error message.
+- Console output matches spec formatting with file URI suffixes.
+- Deterministic ordering verified by unit and golden tests.
 
 **Risks/Dependencies**
 
-- Requires config loader and rules compiler for `--config` validation.
+- Requires absolute path resolution for file URIs.
+- Console output change impacts golden snapshots.
 
-## Phase 3: Config loading + scan request construction
+## Phase 2: JSON formatter
 
-**Goal:** Load rules config, apply precedence, build `ScanRequest`.
-**Status:** Complete
-**Paths:** `internal/config/`, `internal/rules/`, `internal/scan/`
-**Reference patterns:** `specs/configuration.md`, `specs/regex-rules.md`, `specs/data-model.md`
+**Goal:** Provide stable JSON output with schema version, matches, and stats.
+**Status:** Partial
+**Paths:** `internal/output/json.go`, `internal/output/json_test.go`, `testdata/golden/output.json`
+**Reference patterns:** `specs/formatter-json.md`
 
-### 3.1 Config loader + rule compilation
+### 2.1 JSON output schema
 
-- [x] Implement YAML parsing for RuleSet and validation of required fields.
-- [x] Compile regex rules with RE2 and normalize severity defaults.
-- [x] Implement message interpolation rules (`$0`, `$1`, `$$`).
-- [x] Enforce RuleSet defaults for `include`, `exclude`, `failOn`, `concurrency`.
+- [x] Emit `schemaVersion = 1` with `matches` array and `stats` object.
+- [x] Ensure deterministic ordering of matches.
+- [x] Write empty `matches` array when no matches exist.
+- [x] Add `fileUri` field to JSON matches (`file://<abs-path>:<line>`).
+- [x] URL-encode file URI paths and handle Windows drive letter format.
 
-### 3.2 CLI precedence integration
+### 2.2 File URI generation (shared helper)
 
-- [x] Apply CLI overrides for `include`, `exclude`, and `failOn`.
-- [x] Resolve effective include/exclude lists per rule.
-- [x] Build `ScanRequest` with roots, rules, include/exclude, max size, concurrency.
+- [x] Reuse shared file URI helper for JSON match entries.
+- [x] Update JSON unit/golden tests to include file URIs.
 
 **Definition of Done**
 
-- `ScanRequest` conforms to `specs/data-model.md` and uses precedence rules.
-- Invalid config or regex compilation exits with code `1`.
+- JSON output matches spec schema including `fileUri` and deterministic ordering.
+- Golden JSON output updated to include file URIs.
 
 **Risks/Dependencies**
 
-- Must align with formatter expectations for rule ordering and severity mapping.
+- Requires absolute path resolution for file URIs.
+- JSON schema change impacts integration tests and golden snapshots.
 
-## Phase 4: Scan engine + output writers
+## Phase 3: SARIF formatter
 
-**Goal:** Implement scanning behavior and output rendering for console/JSON/SARIF.
+**Goal:** Provide SARIF 2.1.0 output with deterministic ordering and rule metadata.
 **Status:** Complete
-**Paths:** `internal/scan/`, `internal/output/`, `internal/io/`
-**Reference patterns:** `specs/core-architecture.md`, `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`
+**Paths:** `internal/output/sarif.go`, `internal/output/sarif_test.go`, `testdata/golden/output.sarif`
+**Reference patterns:** `specs/formatter-sarif.md`
 
-### 4.1 Scan engine
+### 3.1 SARIF rule + result mapping
 
-- [x] Walk filesystem roots and apply include/exclude glob filtering.
-- [x] Skip files exceeding `maxFileSizeBytes` or binary detection (per core spec).
-- [x] Capture matches with 1-based line/column rune indices.
-- [x] Add scan result data models (`Match`, `ScanStats`, `ScanResult`) in `internal/scan`.
-- [x] Aggregate `ScanResult` with deterministic ordering.
-- [x] Treat file read errors as skipped files while continuing scan.
-
-### 4.2 Console output
-
-- [x] Implement console formatter with grouping by file and summary line.
-- [x] Ensure `No matches found.` output when no matches.
-
-### 4.3 JSON output
-
-- [x] Implement JSON formatter with `schemaVersion = 1` and stable ordering.
-- [x] Write to stdout or `--out-json` per rules.
-
-### 4.4 SARIF output
-
-- [x] Implement SARIF formatter using rule ids `RC0001`+.
-- [x] Map severities and set `columnKind` to `unicodeCodePoints`.
-- [x] Compute `endColumn` as exclusive with rune length of `matchText`.
+- [x] Emit SARIF log with `version = 2.1.0`, `$schema`, single run, `columnKind = unicodeCodePoints`.
+- [x] Map severities to SARIF levels (`error|warning|note`).
+- [x] Map start line/column and end column using rune length.
+- [x] Use normalized path (`/`) for `artifactLocation.uri` and deterministic ordering.
+- [x] Confirm rule id mapping uses rule order and 1-based index with `RC0001` format.
 
 **Definition of Done**
 
-- Outputs match formatter specs and are deterministic across runs.
-- Exit code is `2` when matches meet or exceed `--fail-on` threshold.
+- SARIF output validates against schema and matches spec mapping rules.
+- Golden SARIF snapshot reflects rule id format and location mapping.
 
 **Risks/Dependencies**
 
-- SARIF requires `github.com/owenrumney/go-sarif/v2/sarif`.
-
-## Phase 5: Tests + validation coverage
-
-**Goal:** Implement unit/integration/golden tests and quality tooling checks.
-**Status:** Complete
-**Paths:** `internal/**`, `testdata/`, `scripts/quality.sh`, `.github/workflows/`
-**Reference patterns:** `specs/testing-and-validations.md`
-
-### 5.1 Unit tests
-
-- [x] Config loader defaulting and validation.
-- [x] Rule compiler regex compilation and message interpolation.
-- [x] Path filtering include/exclude behavior.
-- [x] Scan engine line/column mapping and match aggregation.
-- [x] Scan engine concurrency uses worker pool for file reads.
-- [x] CLI routing for `analyze` command.
-- [x] Init command parsing and overwrite behavior.
-- [x] Validate output paths are writable for JSON/SARIF flags.
-- [x] Validate rule paths/exclude lists reject invalid YAML types.
-- [x] JSON output uses lower camel case fields.
-
-### 5.2 Integration + golden tests
-
-- [x] CLI analyze happy path with fixture rules and sample files.
-- [x] Exit code behavior for invalid config and `failOn` threshold.
-- [x] JSON/SARIF output validation and deterministic ordering.
-- [x] Golden snapshots for console/JSON/SARIF outputs.
-- [x] Testdata fixtures for example/fail configs in CLI analyze.
-
-### 5.3 Quality tooling baseline
-
-- [x] Quality runner present (`scripts/quality.sh`).
-- [x] Lint + architecture config present (`.golangci.yml`, `.go-arch-lint.yml`).
-- [x] Git hooks config present (`lefthook.yml`).
-- [x] CI workflows present (`.github/workflows/quality.yml`, `.github/workflows/quality-local.yml`).
-
-**Definition of Done**
-
-- `go test ./...` passes with coverage/mutation thresholds per spec.
-- `scripts/quality.sh all` succeeds in local environment.
-
-**Risks/Dependencies**
-
-- Requires test fixtures under `testdata/` and stable output ordering.
+- Rule index defaulting in scan engine must align with 1-based rule id mapping.
 
 ## Verification Log
 
-- 2026-03-04: `go test ./internal/scan -run TestRunCapturesRuneLineAndColumn` - pass.
-- 2026-03-04: `go test ./internal/scan` - pass.
-- 2026-03-04: `go test ./internal/scan -run TestRunUsesConcurrencyForFileReads` - pass.
-- 2026-03-04: `go test ./internal/scan -run TestEvaluateFileSkipsOnUnreadableFile` - pass.
-- 2026-03-04: `go test ./...` - pass.
-- 2026-03-04: `bash scripts/quality.sh coverage` - pass.
-- 2026-03-04: `go test ./internal/output -run TestWriteJSONNoMatches` - pass.
-- 2026-03-04: `go test ./internal/output` - pass.
-- 2026-03-04: `UPDATE_GOLDEN=1 go test ./internal/output -run TestGolden` - pass.
-- 2026-03-04: `go test ./internal/output -run TestWriteJSONNoMatchesUsesEmptyArray` - pass.
-- 2026-03-04: `go test ./internal/output` - pass.
-- 2026-03-04: `go test ./internal/output -run TestGolden` - pass.
-- 2026-03-04: `go test ./cmd/regex-checker` - pass.
-- 2026-03-04: `go test ./internal/cli` - pass.
-- 2026-03-04: `go test ./internal/output` - pass.
-- 2026-03-04: `go test ./internal/scan -run TestCollectFilesFiltersByIncludeExclude` - pass.
-- 2026-03-04: `go test ./internal/scan` - pass.
-- 2026-03-04: `go test ./...` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestBuildScanRequest` - pass.
-- 2026-03-04: Read `specs/cli-analyze.md` - documented flags, validations, exit codes, and output rules.
-- 2026-03-04: Read `specs/cli.md` - confirmed CLI command structure and alias requirements.
-- 2026-03-04: Read `specs/core-architecture.md` - captured module layout and scan/output flow.
-- 2026-03-04: Read `specs/data-model.md` - confirmed `ScanRequest`, `Match`, `ScanResult` fields.
-- 2026-03-04: Read formatter specs (`specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`) - captured ordering/output requirements.
-- 2026-03-04: `git log -n 10 -- specs` - reviewed recent spec changes for analyze scope.
-- 2026-03-04: `glob **/*.go` - no Go source files found.
-- 2026-03-04: `glob internal/**`, `glob cmd/**` - no implementation directories found.
-- 2026-03-04: `go test ./internal/rules` - pass.
-- 2026-03-04: Read quality/tooling configs (`scripts/quality.sh`, `.golangci.yml`, `.go-arch-lint.yml`, `lefthook.yml`, `.github/workflows/quality*.yml`) - tooling baseline present.
-- 2026-03-04: `go test ./internal/cli` - pass.
-- 2026-03-04: `go test ./internal/cli` - pass (added analyze routing coverage).
-- 2026-03-04: `go test ./...` - pass.
-- 2026-03-04: `bash scripts/quality.sh all` - pass.
-- 2026-03-04: `go test ./internal/config -run TestLoadRuleSetRejectsIncludeNotList` - pass.
-- 2026-03-04: `go test ./internal/config` - pass.
-- 2026-03-04: `go test ./internal/cli` - pass.
-- 2026-03-04: `bash scripts/quality.sh all` - pass.
-- 2026-03-04: `go test ./internal/config` - pass.
-- 2026-03-04: `go test ./...` - pass.
-- 2026-03-04: `go test ./internal/config -run TestRuleSetToRulesDefaultsRulePathsAndExclude` - pass.
-- 2026-03-04: `go test ./internal/config -run TestRuleSetToRulesDefaultsConcurrency` - pass.
-- 2026-03-04: `go test ./internal/scan -run TestScanModelsHoldFields` - pass.
-- 2026-03-04: `go test ./internal/output` - pass.
-- 2026-03-04: `bash scripts/quality.sh all` - pass.
-- 2026-03-04: `go test ./internal/scan -run TestRunScansFileRoot` - pass.
-- 2026-03-04: `go test ./internal/scan` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestParseInitDefaults` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestHandleInit` - pass.
-- 2026-03-04: `go test ./cmd/regex-checker -run TestRunRoutesInit` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestParseAnalyzeRejectsUnwritableOutJSON` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestParseAnalyzeRejectsUnwritableOutSARIF` - pass.
-- 2026-03-04: `go test ./internal/cli` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestBuildScanRequestUsesRuleSetConcurrencyWhenNotSetInCLI` - pass.
-- 2026-03-04: `go test ./internal/cli -run TestBuildScanRequestUsesCLIConcurrencyWhenSet` - pass.
-- 2026-03-04: `go test ./internal/config -run TestLoadRuleSetRejectsRulePathsNotList` - pass.
-- 2026-03-04: `go test ./cmd/regex-checker -run TestRunAnalyzeUsesTestdata` - pass.
-- 2026-03-04: `go test ./cmd/regex-checker` - pass.
-- 2026-03-04: `go test ./internal/output -run TestWriteJSON` - pass.
-- 2026-03-04: `go test ./internal/output -run TestGolden` - fail.
-- 2026-03-04: `UPDATE_GOLDEN=1 go test ./internal/output -run TestGolden` - pass.
+- 2026-03-05: `git log -n 5 -- specs/formatter-console.md specs/formatter-json.md specs/formatter-sarif.md` - confirmed formatter spec updates.
+- 2026-03-05: Read `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/testing-and-validations.md` - captured formatter requirements.
+- 2026-03-05: Read `internal/output/console.go`, `internal/output/json.go`, `internal/output/sarif.go` - verified formatter implementations.
+- 2026-03-05: Read `internal/output/*_test.go`, `testdata/golden/*` - verified formatter tests and golden snapshots.
+- 2026-03-05: Read `internal/scan/model.go` - confirmed match fields used by formatters.
+- 2026-03-05: `go test ./internal/output -run "TestWriteConsoleOrdersAndGroupsMatches|TestWriteJSONOrdersMatches"` - passed.
+- 2026-03-05: `UPDATE_GOLDEN=1 go test ./internal/output -run TestGolden` - passed (updated golden snapshots).
 
 ## Summary
 
-| Phase                                  | Status   |
-| -------------------------------------- | -------- |
-| Phase 1: CLI entrypoint + routing      | Complete |
-| Phase 2: Flag parsing + validation     | Complete |
-| Phase 3: Config loading + scan request | Complete |
-| Phase 4: Scan engine + output writers  | Complete |
-| Phase 5: Tests + validation coverage   | Complete |
+| Phase                      | Status   |
+| -------------------------- | -------- |
+| Phase 1: Console formatter | Complete |
+| Phase 2: JSON formatter    | Complete |
+| Phase 3: SARIF formatter   | Complete |
 
 **Remaining effort:** None.
 
 ## Known Existing Work
 
-- Tooling baseline present: `go.mod`, `scripts/quality.sh`, `.golangci.yml`, `.go-arch-lint.yml`, `lefthook.yml`, `.github/workflows/quality.yml`, `.github/workflows/quality-local.yml`.
-- CLI entrypoint + routing scaffolding added in `cmd/regex-checker/` and `internal/cli/`.
+- Console/JSON/SARIF formatter implementations exist under `internal/output/` with deterministic ordering.
+- Formatter unit tests and golden snapshots exist under `internal/output/*_test.go` and `testdata/golden/`.
+- SARIF formatter uses `github.com/owenrumney/go-sarif/v2/sarif` and sets `columnKind` to `unicodeCodePoints`.
 
 ## Manual Deployment Tasks
 

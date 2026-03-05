@@ -33,29 +33,8 @@ func WriteConsole(result scan.Result, out io.Writer) error {
 	})
 
 	var builder strings.Builder
-	if len(matches) == 0 {
-		builder.WriteString("No matches found.\n")
-	} else {
-		currentFile := ""
-		for _, match := range matches {
-			if match.FilePath != currentFile {
-				if currentFile != "" {
-					builder.WriteString("\n")
-				}
-				currentFile = match.FilePath
-				builder.WriteString(match.FilePath)
-				builder.WriteString("\n")
-			}
-			builder.WriteString("  ")
-			builder.WriteString(fmt.Sprintf(
-				"%-5s %d:%d %s\n",
-				severityLabel(match.Severity),
-				match.Line,
-				match.Column,
-				match.Message,
-			))
-		}
-		builder.WriteString("\n")
+	if err := appendConsoleMatches(&builder, matches); err != nil {
+		return err
 	}
 
 	builder.WriteString(fmt.Sprintf("Summary: files=%d skipped=%d matches=%d durationMs=%d\n",
@@ -68,6 +47,50 @@ func WriteConsole(result scan.Result, out io.Writer) error {
 	_, err := io.WriteString(out, builder.String())
 
 	return err
+}
+
+func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error {
+	if len(matches) == 0 {
+		builder.WriteString("No matches found.\n")
+
+		return nil
+	}
+
+	currentFile := ""
+	for _, match := range matches {
+		if match.FilePath != currentFile {
+			if currentFile != "" {
+				builder.WriteString("\n")
+			}
+			currentFile = match.FilePath
+			builder.WriteString(match.FilePath)
+			builder.WriteString("\n")
+		}
+		line, err := formatConsoleMatchLine(match)
+		if err != nil {
+			return err
+		}
+		builder.WriteString(line)
+	}
+	builder.WriteString("\n")
+
+	return nil
+}
+
+func formatConsoleMatchLine(match scan.Match) (string, error) {
+	fileURI, err := fileURIWithLine(match.FilePath, match.Line)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		"  %-5s %d:%d %s %s\n",
+		severityLabel(match.Severity),
+		match.Line,
+		match.Column,
+		match.Message,
+		fileURI,
+	), nil
 }
 
 const (

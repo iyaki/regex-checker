@@ -1,10 +1,10 @@
 a/file.go
-  ERROR 2:5 Error msg
-  WARN  2:5 Alpha warn
-  WARN  2:5 Zulu warn
-  INFO  10:1 Info msg
+  ERROR 2:5 Error msg file:///workspaces/regex-checker/internal/output/a/file.go:2
+  WARN  2:5 Alpha warn file:///workspaces/regex-checker/internal/output/a/file.go:2
+  WARN  2:5 Zulu warn file:///workspaces/regex-checker/internal/output/a/file.go:2
+  INFO  10:1 Info msg file:///workspaces/regex-checker/internal/output/a/file.go:10
 
 b/file.go
-  WARN  2:3 Warn msg
+  WARN  2:3 Warn msg file:///workspaces/regex-checker/internal/output/b/file.go:2
 
 Summary: files=2 skipped=1 matches=5 durationMs=12

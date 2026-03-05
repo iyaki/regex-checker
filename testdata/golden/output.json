@@ -5,6 +5,7 @@
 			"message": "Error msg",
 			"severity": "error",
 			"filePath": "a/file.go",
+			"fileUri": "file:///workspaces/regex-checker/internal/output/a/file.go:2",
 			"line": 2,
 			"column": 5,
 			"matchText": ""
@@ -13,6 +14,7 @@
 			"message": "Alpha warn",
 			"severity": "warning",
 			"filePath": "a/file.go",
+			"fileUri": "file:///workspaces/regex-checker/internal/output/a/file.go:2",
 			"line": 2,
 			"column": 5,
 			"matchText": ""
@@ -21,6 +23,7 @@
 			"message": "Zulu warn",
 			"severity": "warning",
 			"filePath": "a/file.go",
+			"fileUri": "file:///workspaces/regex-checker/internal/output/a/file.go:2",
 			"line": 2,
 			"column": 5,
 			"matchText": ""
@@ -29,6 +32,7 @@
 			"message": "Info msg",
 			"severity": "info",
 			"filePath": "a/file.go",
+			"fileUri": "file:///workspaces/regex-checker/internal/output/a/file.go:10",
 			"line": 10,
 			"column": 1,
 			"matchText": ""
@@ -37,6 +41,7 @@
 			"message": "Warn msg",
 			"severity": "warning",
 			"filePath": "b/file.go",
+			"fileUri": "file:///workspaces/regex-checker/internal/output/b/file.go:2",
 			"line": 2,
 			"column": 3,
 			"matchText": ""

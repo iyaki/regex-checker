@@ -18,6 +18,7 @@ type jsonMatch struct {
 	Message   string `json:"message"`
 	Severity  string `json:"severity"`
 	FilePath  string `json:"filePath"`
+	FileURI   string `json:"fileUri"`
 	Line      int    `json:"line"`
 	Column    int    `json:"column"`
 	MatchText string `json:"matchText"`
@@ -52,9 +53,14 @@ func WriteJSON(result scan.Result, out io.Writer) error {
 		return left.Message < right.Message
 	})
 
+	jsonMatches, err := buildJSONMatches(matches)
+	if err != nil {
+		return err
+	}
+
 	payload := jsonResult{
 		SchemaVersion: 1,
-		Matches:       buildJSONMatches(matches),
+		Matches:       jsonMatches,
 		Stats:         buildJSONStats(result.Stats),
 	}
 
@@ -64,24 +70,29 @@ func WriteJSON(result scan.Result, out io.Writer) error {
 	return encoder.Encode(payload)
 }
 
-func buildJSONMatches(matches []scan.Match) []jsonMatch {
+func buildJSONMatches(matches []scan.Match) ([]jsonMatch, error) {
 	if len(matches) == 0 {
-		return []jsonMatch{}
+		return []jsonMatch{}, nil
 	}
 
 	converted := make([]jsonMatch, len(matches))
 	for i, match := range matches {
+		fileURI, err := fileURIWithLine(match.FilePath, match.Line)
+		if err != nil {
+			return nil, err
+		}
 		converted[i] = jsonMatch{
 			Message:   match.Message,
 			Severity:  match.Severity,
 			FilePath:  match.FilePath,
+			FileURI:   fileURI,
 			Line:      match.Line,
 			Column:    match.Column,
 			MatchText: match.MatchText,
 		}
 	}
 
-	return converted
+	return converted, nil
 }
 
 func buildJSONStats(stats scan.Stats) jsonStats {
