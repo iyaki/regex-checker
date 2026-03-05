@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/iyaki/regex-checker/internal/rules"
 	"github.com/iyaki/regex-checker/internal/scan"
 )
 
@@ -119,6 +121,54 @@ func TestFormatConsoleMatchLine(t *testing.T) {
 		"  " + absPath + "\n"
 	if line != expected {
 		t.Fatalf("unexpected match line: %s", line)
+	}
+}
+
+func TestWriteConsoleUsesScanRootForAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	scanRoot := filepath.Join(root, "fixtures")
+	if err := os.MkdirAll(scanRoot, 0o755); err != nil {
+		t.Fatalf("failed to create fixtures dir: %v", err)
+	}
+	filePath := filepath.Join(scanRoot, "sample.txt")
+	if err := os.WriteFile(filePath, []byte("token=abc"), 0o600); err != nil {
+		t.Fatalf("failed to write fixture: %v", err)
+	}
+
+	request := scan.Request{
+		Roots: []string{scanRoot},
+		Rules: []rules.Rule{
+			{
+				Message:  "Found $0",
+				Regex:    "token=[a-z]+",
+				Severity: "error",
+				Paths:    []string{"**/*"},
+			},
+		},
+		Include:          []string{"**/*"},
+		Exclude:          nil,
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	result, err := scan.Run(request)
+	if err != nil {
+		t.Fatalf("unexpected scan error: %v", err)
+	}
+	if len(result.Matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(result.Matches))
+	}
+
+	var buffer bytes.Buffer
+	if err := WriteConsole(result, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedLine := fmt.Sprintf("%s:1", filePath)
+	if !strings.Contains(buffer.String(), expectedLine) {
+		t.Fatalf("expected absolute path %s in output, got:\n%s", expectedLine, buffer.String())
 	}
 }
 

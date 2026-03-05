@@ -90,7 +90,7 @@ func buildJSONMatches(matches []scan.Match) ([]jsonMatch, error) {
 
 	converted := make([]jsonMatch, len(matches))
 	for i, match := range matches {
-		absolutePath, err := absolutePathWithLine(match.FilePath, match.Line)
+		absolutePath, err := absolutePathWithLine(match.FilePath, match.Root, match.Line)
 		if err != nil {
 			return nil, err
 		}

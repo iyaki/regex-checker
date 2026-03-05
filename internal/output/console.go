@@ -89,7 +89,7 @@ func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error 
 }
 
 func formatConsoleMatchLine(match scan.Match) (string, error) {
-	absPath, err := absolutePathWithLine(match.FilePath, match.Line)
+	absPath, err := absolutePathWithLine(match.FilePath, match.Root, match.Line)
 	if err != nil {
 		return "", err
 	}
@@ -104,8 +104,21 @@ func formatConsoleMatchLine(match scan.Match) (string, error) {
 	), nil
 }
 
-func absolutePathWithLine(filePath string, line int) (string, error) {
-	absPath, err := filepath.Abs(filePath)
+func absolutePathWithLine(filePath string, root string, line int) (string, error) {
+	if filePath == "" {
+		return "", fmt.Errorf("file path required")
+	}
+	if root == "" {
+		absPath, err := filepath.Abs(filePath)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("%s:%d", absPath, line), nil
+	}
+
+	fullPath := filepath.Join(root, filepath.FromSlash(filePath))
+	absPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return "", err
 	}

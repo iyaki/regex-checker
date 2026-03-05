@@ -249,6 +249,7 @@ func scanEntry(entry fileEntry, compiled []compiledRule, entryIndex int) scanEnt
 				Message:   message,
 				Severity:  rule.rule.Severity,
 				FilePath:  entry.relPath,
+				Root:      entry.root,
 				Line:      line,
 				Column:    column,
 				MatchText: captures[0],

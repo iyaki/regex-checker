@@ -4,8 +4,12 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/iyaki/regex-checker/internal/rules"
 	"github.com/iyaki/regex-checker/internal/scan"
 )
 
@@ -164,6 +168,62 @@ func TestWriteJSONUsesLowerCamelCaseKeys(t *testing.T) {
 	assertLowerCamelCaseStatsKeys(t, stats)
 }
 
+func TestWriteJSONUsesScanRootForAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	scanRoot := filepath.Join(root, "fixtures")
+	if err := os.MkdirAll(scanRoot, 0o755); err != nil {
+		t.Fatalf("failed to create fixtures dir: %v", err)
+	}
+	filePath := filepath.Join(scanRoot, "sample.txt")
+	if err := os.WriteFile(filePath, []byte("token=abc"), 0o600); err != nil {
+		t.Fatalf("failed to write fixture: %v", err)
+	}
+
+	request := scan.Request{
+		Roots: []string{scanRoot},
+		Rules: []rules.Rule{
+			{
+				Message:  "Found $0",
+				Regex:    "token=[a-z]+",
+				Severity: "error",
+				Paths:    []string{"**/*"},
+			},
+		},
+		Include:          []string{"**/*"},
+		Exclude:          nil,
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	result, err := scan.Run(request)
+	if err != nil {
+		t.Fatalf("unexpected scan error: %v", err)
+	}
+	if len(result.Matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(result.Matches))
+	}
+
+	var buffer bytes.Buffer
+	if err := WriteJSON(result, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var got jsonOutputResult
+	if err := json.Unmarshal(buffer.Bytes(), &got); err != nil {
+		t.Fatalf("failed to parse json output: %v", err)
+	}
+	if len(got.Matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(got.Matches))
+	}
+
+	expected := fmt.Sprintf("%s:1", filePath)
+	if got.Matches[0].AbsolutePath != expected {
+		t.Fatalf("unexpected absolutePath: %s", got.Matches[0].AbsolutePath)
+	}
+}
+
 func sampleMatches() []scan.Match {
 	return []scan.Match{
 		{
@@ -304,8 +364,11 @@ func assertAbsolutePath(t *testing.T, filePath string, line int, absolutePath st
 	if absolutePath == "" {
 		t.Fatalf("expected absolutePath to be set")
 	}
+	if filePath == "" {
+		t.Fatalf("expected file path to be set")
+	}
 
-	expected, err := absolutePathWithLine(filePath, line)
+	expected, err := absolutePathWithLine(filePath, "", line)
 	if err != nil {
 		t.Fatalf("failed to build absolute path: %v", err)
 	}

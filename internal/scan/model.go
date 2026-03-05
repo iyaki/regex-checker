@@ -18,6 +18,7 @@ type Match struct {
 	Message   string
 	Severity  string
 	FilePath  string
+	Root      string `json:"-"`
 	Line      int
 	Column    int
 	MatchText string
