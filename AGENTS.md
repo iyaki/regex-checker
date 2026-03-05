@@ -6,6 +6,7 @@
 - Assume specs describe intent, not implementation.
 - Verify reality in the codebase before claiming something exists.
 - Implement to spec patterns and data shapes; update specs only when asked.
+- When Writting specs, **NEVER** follow Test Driven Development practices. Write the spec first and stop.
 
 ## Testing and Quality Gates
 
