@@ -3,6 +3,10 @@
   "input": {
     "maxFileSize": 52428800
   },
+  "include": [
+		"cmd",
+		"internal"
+	],
   "output": {
     "filePath": "repomix-output.xml",
     "style": "xml",
@@ -27,7 +31,6 @@
       "includeLogsCount": 50
     }
   },
-  "include": [],
   "ignore": {
     "useGitignore": true,
     "useDotIgnore": true,
