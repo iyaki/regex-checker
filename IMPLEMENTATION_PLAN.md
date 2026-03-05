@@ -18,7 +18,7 @@
 ## Phase 9: Help detection + routing
 
 **Goal:** Detect `--help`/`-h` at root and subcommand level, short-circuit handlers, and exit `0`.
-**Status:** In progress (baseline no-args help and unknown command behavior verified)
+**Status:** Complete
 **Paths:** `cmd/reglint/main.go`, `internal/cli/cli.go`
 **Reference patterns:** `internal/cli/cli.go`, `specs/cli-help.md` (workflows, exit codes)
 
@@ -31,8 +31,8 @@
 
 ### 9.2 Subcommand help detection
 
-- [ ] For `analyze`/`analyse`, detect `--help`/`-h` in remaining args and short-circuit.
-- [ ] For `init`, detect `--help`/`-h` in remaining args and short-circuit.
+- [x] For `analyze`/`analyse`, detect `--help`/`-h` in remaining args and short-circuit.
+- [x] For `init`, detect `--help`/`-h` in remaining args and short-circuit.
 - [x] Preserve existing unknown command behavior (`Unknown command: <name>` and exit `1`) even when `--help` is present.
 
 **Definition of Done**
@@ -48,22 +48,22 @@
 ## Phase 10: Help topics + rendering
 
 **Goal:** Implement structured help topics and renderer aligned with `HelpTopic` and formatting rules.
-**Status:** Not started
+**Status:** Complete
 **Paths:** `internal/cli/help.go` (new), `internal/cli/cli.go`
 **Reference patterns:** `internal/cli/cli.go`, `specs/cli-help.md` (data model, formatting rules)
 
 ### 10.1 Help data model
 
-- [ ] Define `HelpTopic` and `HelpFlag` structs in `internal/cli/help.go`.
-- [ ] Encode topics for `root`, `analyze`, and `init`.
-- [ ] Ensure `analyse` alias maps to the `analyze` topic.
+- [x] Define `HelpTopic` and `HelpFlag` structs in `internal/cli/help.go`.
+- [x] Encode topics for `root`, `analyze`, and `init`.
+- [x] Ensure `analyse` alias maps to the `analyze` topic.
 
 ### 10.2 Help rendering
 
-- [ ] Render `Usage:` section and usage lines in order.
-- [ ] Render `Commands:` section for root help.
-- [ ] Render `Flags:` section with single-line format and `none` defaults when unset.
-- [ ] Omit short flag prefix when missing while keeping alignment.
+- [x] Render `Usage:` section and usage lines in order.
+- [x] Render `Commands:` section for root help.
+- [x] Render `Flags:` section with single-line format and `none` defaults when unset.
+- [x] Omit short flag prefix when missing while keeping alignment.
 
 **Definition of Done**
 
@@ -77,26 +77,26 @@
 ## Phase 11: Help flag wiring + tests
 
 **Goal:** Wire help detection into analyze/init argument parsing and add tests that lock output.
-**Status:** Not started
+**Status:** Complete
 **Paths:** `internal/cli/analyze.go`, `internal/cli/init.go`, `internal/cli/cli_test.go`, `cmd/reglint/main_test.go`
 **Reference patterns:** `internal/cli/cli_test.go`, `specs/cli-help.md` verifications
 
 ### 11.1 Analyze help path
 
-- [ ] Ensure `reglint analyze --help` and `reglint analyse -h` exit `0` and do not load config or scan.
-- [ ] Include analyze flags from `specs/cli-analyze.md` plus `-h/--help`.
+- [x] Ensure `reglint analyze --help` and `reglint analyse -h` exit `0` and do not load config or scan.
+- [x] Include analyze flags from `specs/cli-analyze.md` plus `-h/--help`.
 
 ### 11.2 Init help path
 
-- [ ] Ensure `reglint init --help` exits `0` and does not write files.
-- [ ] Include init flags from `specs/cli-init.md` plus `-h/--help`.
+- [x] Ensure `reglint init --help` exits `0` and does not write files.
+- [x] Include init flags from `specs/cli-init.md` plus `-h/--help`.
 
 ### 11.3 CLI help tests
 
-- [ ] Add tests for root help output and exit code `0`.
-- [ ] Add tests for analyze/analyse help output and exit code `0`.
-- [ ] Add tests for init help output and exit code `0`.
-- [ ] Add tests for `reglint bogus --help` to ensure it still exits `1` and prints only the unknown command error.
+- [x] Add tests for root help output and exit code `0`.
+- [x] Add tests for analyze/analyse help output and exit code `0`.
+- [x] Add tests for init help output and exit code `0`.
+- [x] Add tests for `reglint bogus --help` to ensure it still exits `1` and prints only the unknown command error.
 
 **Definition of Done**
 
@@ -115,16 +115,17 @@
 - 2026-03-05: Read `internal/cli/analyze.go`, `internal/cli/init.go` - verified flag parsing runs before any help short-circuit and can touch filesystem.
 - 2026-03-05: Read `internal/cli/cli_test.go`, `cmd/reglint/main_test.go` - confirmed tests cover empty-args help and unknown command only.
 - 2026-03-05: `go test ./internal/cli -run TestRunShowsHelpForRootFlag` - passed.
+- 2026-03-05: `go test ./internal/cli` - passed.
 
 ## Summary
 
-| Phase                              | Status      |
-| ---------------------------------- | ----------- |
-| Phase 9: Help detection + routing  | In progress |
-| Phase 10: Help topics + rendering  | Not started |
-| Phase 11: Help flag wiring + tests | Not started |
+| Phase                              | Status   |
+| ---------------------------------- | -------- |
+| Phase 9: Help detection + routing  | Complete |
+| Phase 10: Help topics + rendering  | Complete |
+| Phase 11: Help flag wiring + tests | Complete |
 
-**Remaining effort:** Implement help topic model + renderer, add analyze/init help detection, and add help-specific tests.
+**Remaining effort:** None.
 
 ## Known Existing Work
 

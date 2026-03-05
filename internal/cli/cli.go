@@ -13,12 +13,12 @@ type Handler func(args []string, out *bytes.Buffer) int
 // Run routes CLI args to the matching handler.
 func Run(args []string, handlers map[string]Handler, out io.Writer) int {
 	if len(args) == 0 {
-		writeHelp(out)
+		writeHelpTopic(out, rootHelpTopic())
 
 		return 1
 	}
 	if isHelpArg(args[0]) {
-		writeHelp(out)
+		writeHelpTopic(out, rootHelpTopic())
 
 		return 0
 	}
@@ -29,6 +29,14 @@ func Run(args []string, handlers map[string]Handler, out io.Writer) int {
 	}
 
 	commandArgs := args[1:]
+	if isHelpRequest(command, commandArgs) {
+		topic, ok := getHelpTopic(command)
+		if ok {
+			writeHelpTopic(out, topic)
+
+			return 0
+		}
+	}
 
 	handler, ok := handlers[command]
 	if !ok {
@@ -48,14 +56,15 @@ func isHelpArg(arg string) bool {
 	return arg == "--help" || arg == "-h"
 }
 
-func writeHelp(out io.Writer) {
-	_, _ = fmt.Fprintln(out, "Usage:")
-	_, _ = fmt.Fprintln(out, "  reglint <command> [flags]")
-	_, _ = fmt.Fprintln(out, "")
-	_, _ = fmt.Fprintln(out, "Commands:")
-	_, _ = fmt.Fprintln(out, "  analyze (alias: analyse)")
-	_, _ = fmt.Fprintln(out, "  init")
-	_, _ = fmt.Fprintln(out, "")
-	_, _ = fmt.Fprintln(out, "Flags:")
-	_, _ = fmt.Fprintln(out, "  -h, --help bool (default false)  Print help and exit.")
+func isHelpRequest(command string, args []string) bool {
+	if command != "analyze" && command != "init" {
+		return false
+	}
+	for _, arg := range args {
+		if isHelpArg(arg) {
+			return true
+		}
+	}
+
+	return false
 }

@@ -69,10 +69,78 @@ func TestRunUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestRunUnknownCommandWithHelpFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := cli.Run([]string{"bogus", "--help"}, map[string]cli.Handler{}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	got := output.String()
+	want := "Unknown command: bogus\n"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
 func TestRunRoutesAnalyzeCommand(t *testing.T) {
 	t.Parallel()
 
 	assertAnalyzeRouting(t, "analyze")
+}
+
+func TestRunShowsHelpForAnalyzeFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := cli.Run([]string{"analyze", "--help"}, map[string]cli.Handler{}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	got := output.String()
+	want := "Usage:\n" +
+		"  reglint analyze [flags] [path ...]\n" +
+		"  reglint analyse [flags] [path ...]\n" +
+		"\n" +
+		"Flags:\n" +
+		"  -h, --help bool (default false)  Print help and exit.\n" +
+		"      --config string (default reglint-rules.yaml)  Path to YAML rules config file.\n" +
+		"      --format string (default console)  Comma-separated list of formats.\n" +
+		"      --out-json string (default none)  Output path for JSON results.\n" +
+		"      --out-sarif string (default none)  Output path for SARIF results.\n" +
+		"      --include string (default none)  Repeatable include glob.\n" +
+		"      --exclude string (default none)  Repeatable exclude glob.\n" +
+		"      --concurrency int (default GOMAXPROCS)  Worker count.\n" +
+		"      --max-file-size int (default 5242880)  Maximum file size in bytes.\n" +
+		"      --fail-on string (default none)  Fail if matches at or above severity.\n"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestRunShowsHelpForInitFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := cli.Run([]string{"init", "-h"}, map[string]cli.Handler{}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	got := output.String()
+	want := "Usage:\n" +
+		"  reglint init [flags]\n" +
+		"\n" +
+		"Flags:\n" +
+		"  -h, --help bool (default false)  Print help and exit.\n" +
+		"      --out string (default reglint-rules.yaml)  Output path for the config file.\n" +
+		"      --force bool (default false)  Overwrite existing config file.\n"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
 }
 
 func assertAnalyzeRouting(t *testing.T, command string) {
