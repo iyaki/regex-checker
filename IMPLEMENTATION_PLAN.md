@@ -1,175 +1,135 @@
-# Implementation Plan (formatter)
+# Implementation Plan (cli-help)
 
-**Status:** Formatter scope partially complete (SARIF aligned; core registry missing; console/JSON output schema mismatch)
+**Status:** Root help flag handling complete; analyze/init help pending
 **Last Updated:** 2026-03-05
-**Primary Specs:** `specs/formatter.md`, `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/data-model.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md`
+**Primary Specs:** `specs/cli-help.md`, `specs/cli.md`, `specs/cli-analyze.md`, `specs/cli-init.md`
 
 ## Quick Reference
 
-| System / Subsystem           | Specs                                                                                                 | Modules / Packages                                                  | Web Packages | Migrations / Artifacts |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------ | ---------------------- |
-| Formatter core + registry    | `specs/formatter.md`                                                                                  | ✅ `internal/output/formatter.go`, ✅ `internal/output/registry.go` | N/A          | N/A                    |
-| Console formatter            | `specs/formatter-console.md`                                                                          | ✅ `internal/output/console.go`                                     | N/A          | N/A                    |
-| JSON formatter               | `specs/formatter-json.md`                                                                             | ✅ `internal/output/json.go`                                        | N/A          | N/A                    |
-| SARIF formatter              | `specs/formatter-sarif.md`                                                                            | ✅ `internal/output/sarif.go`                                       | N/A          | N/A                    |
-| File URI helper (non-spec)   | N/A                                                                                                   | ✅ `internal/output/file_uri.go`                                    | N/A          | N/A                    |
-| Formatter tests + golden     | `specs/testing-and-validations.md`                                                                    | ✅ `internal/output/*_test.go`                                      | N/A          | ✅ `testdata/golden/*` |
-| Formatter data model link    | `specs/data-model.md`                                                                                 | ✅ `internal/scan/model.go`                                         | N/A          | N/A                    |
-| CLI output wiring (relation) | `specs/cli-analyze.md`, `specs/cli.md`                                                                | ✅ `internal/cli/analyze.go`, `internal/cli/cli.go`                 | N/A          | N/A                    |
-| Scan engine data source      | `specs/core-architecture.md`, `specs/regex-rules.md`, `specs/configuration.md`, `specs/data-model.md` | ✅ `internal/scan/*`, `internal/rules/*`, `internal/config/*`       | N/A          | N/A                    |
+| System / Subsystem           | Specs                                                   | Modules / Packages                                                               | Web Packages | Migrations / Artifacts |
+| ---------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------ | ---------------------- |
+| CLI routing baseline         | `specs/cli.md`                                          | `cmd/reglint/main.go` ✅, `internal/cli/cli.go` ✅                               | N/A          | N/A                    |
+| CLI help routing             | `specs/cli-help.md`, `specs/cli.md`                     | `cmd/reglint/main.go`, `internal/cli/cli.go`                                     | N/A          | N/A                    |
+| Help topics + renderer       | `specs/cli-help.md`                                     | `internal/cli/help.go` (planned)                                                 | N/A          | N/A                    |
+| Analyze command help surface | `specs/cli-help.md`, `specs/cli-analyze.md`             | `internal/cli/analyze.go`                                                        | N/A          | N/A                    |
+| Init command help surface    | `specs/cli-help.md`, `specs/cli-init.md`                | `internal/cli/init.go`                                                           | N/A          | N/A                    |
+| CLI help tests               | `specs/cli-help.md`, `specs/testing-and-validations.md` | `internal/cli/cli_test.go`, `cmd/reglint/main_test.go`, `internal/cli/*_test.go` | N/A          | N/A                    |
 
-## Phase 1: Formatter core contract + registry
+## Phase 9: Help detection + routing
 
-**Goal:** Implement shared formatter interface and registry described in `specs/formatter.md`.
-**Status:** Complete
-**Paths:** `internal/output/formatter.go`, `internal/output/registry.go`, `internal/cli/analyze.go`
-**Reference patterns:** `specs/formatter.md`
+**Goal:** Detect `--help`/`-h` at root and subcommand level, short-circuit handlers, and exit `0`.
+**Status:** In progress (baseline no-args help and unknown command behavior verified)
+**Paths:** `cmd/reglint/main.go`, `internal/cli/cli.go`
+**Reference patterns:** `internal/cli/cli.go`, `specs/cli-help.md` (workflows, exit codes)
 
-### 1.1 Formatter interface
+### 9.1 Root help detection
 
-- [x] Add `Formatter` interface with `Name() string` and `Write(result scan.Result, out io.Writer) error`.
-- [x] Ensure format identifiers are lowercase and stable (`console`, `json`, `sarif`).
-- [x] Keep formatters stateless and only write to the provided writer.
+- [x] Detect `reglint --help` or `reglint -h` before routing.
+- [x] Emit root help output with Usage/Commands/Flags sections in required order.
+- [x] Exit `0` for help requests.
+- [x] Baseline no-args help prints Usage/Commands (missing Flags section and help flag handling).
 
-### 1.2 Registry + CLI integration
+### 9.2 Subcommand help detection
 
-- [x] Add registry map for formatters and resolve requested formats from `--format`.
-- [x] Return a single error for unknown formats (preserve CLI behavior in `internal/cli/analyze.go`).
-- [x] Ensure CLI uses registry lookup instead of direct `switch` over format strings.
+- [ ] For `analyze`/`analyse`, detect `--help`/`-h` in remaining args and short-circuit.
+- [ ] For `init`, detect `--help`/`-h` in remaining args and short-circuit.
+- [x] Preserve existing unknown command behavior (`Unknown command: <name>` and exit `1`) even when `--help` is present.
 
 **Definition of Done**
 
-- Formatter interface and registry exist under `internal/output/` and are wired through CLI format resolution.
-- Format resolution returns deterministic errors for unknown formats.
-- Unit tests cover registry resolution and duplicate format handling.
+- Help detection occurs before config loading or scans.
+- Root help exits `0` without side effects.
+- Unknown command handling remains unchanged.
 
 **Risks/Dependencies**
 
-- CLI output flow currently bypasses a registry; updates must preserve existing validation and output rules.
+- Must avoid invoking flag parsing for help requests to keep filesystem-independent behavior.
 
-## Phase 2: Console formatter alignment
+## Phase 10: Help topics + rendering
 
-**Goal:** Align console output with `specs/formatter-console.md` (two-line entries, absolute path line, no file URIs).
-**Status:** Complete
-**Paths:** `internal/output/console.go`, `internal/output/console_test.go`, `testdata/golden/console.txt`
-**Reference patterns:** `specs/formatter-console.md`
+**Goal:** Implement structured help topics and renderer aligned with `HelpTopic` and formatting rules.
+**Status:** Not started
+**Paths:** `internal/cli/help.go` (new), `internal/cli/cli.go`
+**Reference patterns:** `internal/cli/cli.go`, `specs/cli-help.md` (data model, formatting rules)
 
-### 2.1 Output shape + content
+### 10.1 Help data model
 
-- [x] Sort matches deterministically by file path, line, column, severity, message.
-- [x] Group matches by file and render a summary line.
-- [x] Print `No matches found.` when there are zero matches.
-- [x] Avoid emitting raw `matchText` in console output.
-- [x] Render a two-line match block with a bullet-prefixed line plus an absolute path line on the next line (per spec).
-- [x] Emit `<absolutePath>:<line>` on the second line (no `file://` URI).
+- [ ] Define `HelpTopic` and `HelpFlag` structs in `internal/cli/help.go`.
+- [ ] Encode topics for `root`, `analyze`, and `init`.
+- [ ] Ensure `analyse` alias maps to the `analyze` topic.
 
-### 2.2 File path handling
+### 10.2 Help rendering
 
-- [x] Shared file URI helper exists for absolute paths with line suffix (non-spec behavior).
-- [x] Replace file URI usage with absolute path rendering per spec or update spec (if instructed).
+- [ ] Render `Usage:` section and usage lines in order.
+- [ ] Render `Commands:` section for root help.
+- [ ] Render `Flags:` section with single-line format and `none` defaults when unset.
+- [ ] Omit short flag prefix when missing while keeping alignment.
 
 **Definition of Done**
 
-- Console output matches spec format including absolute path line and spacing.
-- Golden tests updated to reflect console output format.
-- Unit tests validate deterministic ordering and `No matches found.` behavior.
+- Output matches ordering and formatting rules in `specs/cli-help.md` examples.
+- Help output uses stdout writer passed into CLI routing.
 
 **Risks/Dependencies**
 
-- Output changes require updating golden snapshots and any downstream consumers.
+- Must stay in sync with analyze/init flag defaults and descriptions from specs.
 
-## Phase 3: JSON formatter alignment
+## Phase 11: Help flag wiring + tests
 
-**Goal:** Align JSON schema with `specs/formatter-json.md` (absolutePath field, no fileUri).
-**Status:** Partial
-**Paths:** `internal/output/json.go`, `internal/output/json_test.go`, `testdata/golden/output.json`
-**Reference patterns:** `specs/formatter-json.md`
+**Goal:** Wire help detection into analyze/init argument parsing and add tests that lock output.
+**Status:** Not started
+**Paths:** `internal/cli/analyze.go`, `internal/cli/init.go`, `internal/cli/cli_test.go`, `cmd/reglint/main_test.go`
+**Reference patterns:** `internal/cli/cli_test.go`, `specs/cli-help.md` verifications
 
-### 3.1 JSON schema compliance
+### 11.1 Analyze help path
 
-- [x] Emit `schemaVersion = 1` with `matches` array and `stats` object.
-- [x] Ensure deterministic ordering of matches.
-- [x] Write empty `matches` array when no matches exist.
-- [x] Replace `fileUri` with `absolutePath` (`<abs-path>:<line>`) per spec.
-- [x] Keep `matchText` present in JSON output.
+- [ ] Ensure `reglint analyze --help` and `reglint analyse -h` exit `0` and do not load config or scan.
+- [ ] Include analyze flags from `specs/cli-analyze.md` plus `-h/--help`.
 
-### 3.2 Output destination rules (CLI integration)
+### 11.2 Init help path
 
-- [x] CLI enforces `--out-json` when multiple formats are selected.
-- [x] JSON-only output uses stdout when `--out-json` is unset.
+- [ ] Ensure `reglint init --help` exits `0` and does not write files.
+- [ ] Include init flags from `specs/cli-init.md` plus `-h/--help`.
+
+### 11.3 CLI help tests
+
+- [ ] Add tests for root help output and exit code `0`.
+- [ ] Add tests for analyze/analyse help output and exit code `0`.
+- [ ] Add tests for init help output and exit code `0`.
+- [ ] Add tests for `reglint bogus --help` to ensure it still exits `1` and prints only the unknown command error.
 
 **Definition of Done**
 
-- JSON output matches spec schema fields and naming.
-- Golden JSON snapshot updated to spec shape.
-- JSON unit tests updated to validate `absolutePath`.
+- Help paths are covered by unit tests matching exact output structure.
+- No tests rely on filesystem state for help output.
 
 **Risks/Dependencies**
 
-- Schema change impacts consumers relying on `fileUri`.
-
-## Phase 4: SARIF formatter verification
-
-**Goal:** Confirm SARIF output adheres to `specs/formatter-sarif.md`.
-**Status:** Complete
-**Paths:** `internal/output/sarif.go`, `internal/output/sarif_test.go`, `testdata/golden/output.sarif`
-**Reference patterns:** `specs/formatter-sarif.md`
-
-### 4.1 SARIF rule + result mapping
-
-- [x] Emit SARIF log with `version = 2.1.0`, `$schema`, single run, `columnKind = unicodeCodePoints`.
-- [x] Map severities to SARIF levels (`error|warning|note`).
-- [x] Map start line/column and end column using rune length.
-- [x] Use normalized path (`/`) for `artifactLocation.uri` and deterministic ordering.
-- [x] Confirm rule id mapping uses rule order and 1-based index with `RC0001` format.
-
-**Definition of Done**
-
-- SARIF output validates against schema and matches spec mapping rules.
-- Golden SARIF snapshot reflects rule id format and location mapping.
-
-**Risks/Dependencies**
-
-- Rule index defaulting in scan engine must align with 1-based rule id mapping.
+- Tests must avoid reading config files or writing output files when help is requested.
 
 ## Verification Log
 
-- 2026-03-05: `git log -n 20 --oneline -- specs/formatter.md specs/formatter-console.md specs/formatter-json.md specs/formatter-sarif.md` - reviewed formatter spec history.
-- 2026-03-05: Read `specs/formatter.md`, `specs/formatter-console.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md` - captured formatter requirements.
-- 2026-03-05: Read `specs/data-model.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md`, `specs/cli.md` - confirmed cross-cutting requirements.
-- 2026-03-05: Listed `internal/output/*` and `internal/cli/*` - confirmed formatter and CLI file inventory.
-- 2026-03-05: Read `internal/output/console.go`, `internal/output/json.go`, `internal/output/sarif.go`, `internal/output/file_uri.go` - verified formatter implementations.
-- 2026-03-05: Read `internal/output/golden_test.go` and `testdata/golden/console.txt`, `testdata/golden/output.json`, `testdata/golden/output.sarif` - verified golden output expectations.
-- 2026-03-05: Read `internal/cli/analyze.go` - verified CLI output wiring and output path validation.
-- 2026-03-05: `go test ./internal/output -run TestRegistry` - passed.
-- 2026-03-05: `go test ./internal/cli -run TestParseAnalyzeInvalidFormat` - passed.
-- 2026-03-05: `go test ./internal/output -run TestWriteConsoleNoMatches` - passed.
-- 2026-03-05: `go test ./internal/output -run TestWriteConsoleOrdersAndGroupsMatches` - passed.
-- 2026-03-05: `go test ./internal/output -run TestFormatConsoleMatchLine` - passed.
-- 2026-03-05: `go test ./internal/output -run TestFormatConsoleMatchLineReturnsErrorWhenCwdMissing` - passed.
-- 2026-03-05: `go test ./internal/output -run TestGoldenConsoleOutput` - passed.
-- 2026-03-05: `go test ./internal/output -run TestWriteJSONOrdersMatches` - failed (expected absolutePath to be set).
-- 2026-03-05: `go test ./internal/output -run TestWriteJSONOrdersMatches` - passed.
-- 2026-03-05: `go test ./internal/output -run TestWriteJSON` - passed.
-- 2026-03-05: `UPDATE_GOLDEN=1 go test ./internal/output -run TestGoldenJSONOutput` - passed.
+- 2026-03-05: `git log -n 10 -- specs/cli-help.md specs/cli.md specs/cli-analyze.md specs/cli-init.md` - reviewed recent CLI spec changes.
+- 2026-03-05: Read `specs/cli-help.md`, `specs/cli.md`, `specs/cli-analyze.md`, `specs/cli-init.md` - captured help flag requirements and defaults.
+- 2026-03-05: Read `cmd/reglint/main.go`, `internal/cli/cli.go` - verified routing has no `--help` handling and no-args help prints Usage/Commands only.
+- 2026-03-05: Read `internal/cli/analyze.go`, `internal/cli/init.go` - verified flag parsing runs before any help short-circuit and can touch filesystem.
+- 2026-03-05: Read `internal/cli/cli_test.go`, `cmd/reglint/main_test.go` - confirmed tests cover empty-args help and unknown command only.
+- 2026-03-05: `go test ./internal/cli -run TestRunShowsHelpForRootFlag` - passed.
 
 ## Summary
 
-| Phase                                 | Status   |
-| ------------------------------------- | -------- |
-| Phase 1: Formatter core + registry    | Complete |
-| Phase 2: Console formatter alignment  | Complete |
-| Phase 3: JSON formatter alignment     | Complete |
-| Phase 4: SARIF formatter verification | Complete |
+| Phase                              | Status      |
+| ---------------------------------- | ----------- |
+| Phase 9: Help detection + routing  | In progress |
+| Phase 10: Help topics + rendering  | Not started |
+| Phase 11: Help flag wiring + tests | Not started |
 
-**Remaining effort:** None.
+**Remaining effort:** Implement help topic model + renderer, add analyze/init help detection, and add help-specific tests.
 
 ## Known Existing Work
 
-- Console, JSON, and SARIF formatter implementations exist under `internal/output/` with deterministic ordering.
-- File URI helper exists at `internal/output/file_uri.go` and is used by console/JSON outputs (non-spec behavior).
-- Formatter unit tests and golden snapshots exist under `internal/output/*_test.go` and `testdata/golden/`.
-- SARIF formatter uses `github.com/owenrumney/go-sarif/v2/sarif` and sets `columnKind` to `unicodeCodePoints`.
+- Root help output now includes `--help`/`-h` handling and `Flags:` section in `internal/cli/cli.go`.
+- CLI routing and analyze/init handlers are implemented under `cmd/reglint/main.go` and `internal/cli/` with existing tests for routing and init/analyze behaviors.
 
 ## Manual Deployment Tasks
 

@@ -17,6 +17,11 @@ func Run(args []string, handlers map[string]Handler, out io.Writer) int {
 
 		return 1
 	}
+	if isHelpArg(args[0]) {
+		writeHelp(out)
+
+		return 0
+	}
 
 	command := args[0]
 	if command == "analyse" {
@@ -39,6 +44,10 @@ func Run(args []string, handlers map[string]Handler, out io.Writer) int {
 	return code
 }
 
+func isHelpArg(arg string) bool {
+	return arg == "--help" || arg == "-h"
+}
+
 func writeHelp(out io.Writer) {
 	_, _ = fmt.Fprintln(out, "Usage:")
 	_, _ = fmt.Fprintln(out, "  reglint <command> [flags]")
@@ -46,4 +55,7 @@ func writeHelp(out io.Writer) {
 	_, _ = fmt.Fprintln(out, "Commands:")
 	_, _ = fmt.Fprintln(out, "  analyze (alias: analyse)")
 	_, _ = fmt.Fprintln(out, "  init")
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "Flags:")
+	_, _ = fmt.Fprintln(out, "  -h, --help bool (default false)  Print help and exit.")
 }

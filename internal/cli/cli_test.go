@@ -29,6 +29,30 @@ func TestRunShowsHelpWhenNoCommand(t *testing.T) {
 	}
 }
 
+func TestRunShowsHelpForRootFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := cli.Run([]string{"--help"}, map[string]cli.Handler{}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	got := output.String()
+	want := "Usage:\n" +
+		"  reglint <command> [flags]\n" +
+		"\n" +
+		"Commands:\n" +
+		"  analyze (alias: analyse)\n" +
+		"  init\n" +
+		"\n" +
+		"Flags:\n" +
+		"  -h, --help bool (default false)  Print help and exit.\n"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
 func TestRunUnknownCommand(t *testing.T) {
 	t.Parallel()
 
