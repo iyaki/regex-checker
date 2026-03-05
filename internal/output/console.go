@@ -4,6 +4,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -72,9 +73,6 @@ func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error 
 	currentFile := ""
 	for _, match := range matches {
 		if match.FilePath != currentFile {
-			if currentFile != "" {
-				builder.WriteString("\n")
-			}
 			currentFile = match.FilePath
 			builder.WriteString(match.FilePath)
 			builder.WriteString("\n")
@@ -84,26 +82,35 @@ func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error 
 			return err
 		}
 		builder.WriteString(line)
+		builder.WriteString("\n")
 	}
-	builder.WriteString("\n")
 
 	return nil
 }
 
 func formatConsoleMatchLine(match scan.Match) (string, error) {
-	fileURI, err := fileURIWithLine(match.FilePath, match.Line)
+	absPath, err := absolutePathWithLine(match.FilePath, match.Line)
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf(
-		"  %-5s %d:%d %s %s\n",
+		"- %-5s %d:%d %s\n  %s\n",
 		severityLabel(match.Severity),
 		match.Line,
 		match.Column,
 		match.Message,
-		fileURI,
+		absPath,
 	), nil
+}
+
+func absolutePathWithLine(filePath string, line int) (string, error) {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s:%d", absPath, line), nil
 }
 
 const (

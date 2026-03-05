@@ -3,7 +3,9 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -103,17 +105,18 @@ func TestFormatConsoleMatchLine(t *testing.T) {
 		Column:   5,
 	}
 
-	fileURI, err := fileURIWithLine(match.FilePath, match.Line)
-	if err != nil {
-		t.Fatalf("failed to build file uri: %v", err)
-	}
-
 	line, err := formatConsoleMatchLine(match)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "  ERROR 2:5 Error msg " + fileURI + "\n"
+	absPath, err := expectedAbsolutePathLine(match.FilePath, match.Line)
+	if err != nil {
+		t.Fatalf("failed to build absolute path: %v", err)
+	}
+
+	expected := "- ERROR 2:5 Error msg\n" +
+		"  " + absPath + "\n"
 	if line != expected {
 		t.Fatalf("unexpected match line: %s", line)
 	}
@@ -151,17 +154,22 @@ func TestFormatConsoleMatchLineReturnsErrorWhenCwdMissing(t *testing.T) {
 func expectedGroupedOutput(t *testing.T) string {
 	t.Helper()
 
-	fileA2 := expectedFileURI(t, "a/file.go", 2)
-	fileA10 := expectedFileURI(t, "a/file.go", 10)
-	fileB2 := expectedFileURI(t, "b/file.go", 2)
+	fileA2 := expectedAbsolutePathLineHelper(t, "a/file.go", 2)
+	fileA10 := expectedAbsolutePathLineHelper(t, "a/file.go", 10)
+	fileB2 := expectedAbsolutePathLineHelper(t, "b/file.go", 2)
 
 	return "a/file.go\n" +
-		"  ERROR 2:5 Error msg " + fileA2 + "\n" +
-		"  WARN  2:5 Alpha warn " + fileA2 + "\n" +
-		"  WARN  2:5 Zulu warn " + fileA2 + "\n" +
-		"  INFO  10:1 Info msg " + fileA10 + "\n\n" +
+		"- ERROR 2:5 Error msg\n" +
+		"  " + fileA2 + "\n\n" +
+		"- WARN  2:5 Alpha warn\n" +
+		"  " + fileA2 + "\n\n" +
+		"- WARN  2:5 Zulu warn\n" +
+		"  " + fileA2 + "\n\n" +
+		"- INFO  10:1 Info msg\n" +
+		"  " + fileA10 + "\n\n" +
 		"b/file.go\n" +
-		"  WARN  2:3 Warn msg " + fileB2 + "\n\n" +
+		"- WARN  2:3 Warn msg\n" +
+		"  " + fileB2 + "\n\n" +
 		"Summary: files=2 skipped=1 matches=5 durationMs=12\n"
 }
 
@@ -173,15 +181,24 @@ func assertConsoleOutput(t *testing.T, got, want string) {
 	}
 }
 
-func expectedFileURI(t *testing.T, filePath string, line int) string {
-	t.Helper()
-
-	uri, err := fileURIWithLine(filePath, line)
+func expectedAbsolutePathLine(filePath string, line int) (string, error) {
+	absPath, err := filepath.Abs(filePath)
 	if err != nil {
-		t.Fatalf("failed to build file uri: %v", err)
+		return "", err
 	}
 
-	return uri
+	return fmt.Sprintf("%s:%d", absPath, line), nil
+}
+
+func expectedAbsolutePathLineHelper(t *testing.T, filePath string, line int) string {
+	t.Helper()
+
+	absPath, err := expectedAbsolutePathLine(filePath, line)
+	if err != nil {
+		t.Fatalf("failed to build absolute path: %v", err)
+	}
+
+	return absPath
 }
 
 func TestSeverityRankKnownValues(t *testing.T) {

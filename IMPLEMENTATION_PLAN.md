@@ -60,13 +60,13 @@
 - [x] Group matches by file and render a summary line.
 - [x] Print `No matches found.` when there are zero matches.
 - [x] Avoid emitting raw `matchText` in console output.
-- [ ] Render a two-line match block with a bullet-prefixed line plus an absolute path line on the next line (per spec).
-- [ ] Emit `<absolutePath>:<line>` on the second line (no `file://` URI).
+- [x] Render a two-line match block with a bullet-prefixed line plus an absolute path line on the next line (per spec).
+- [x] Emit `<absolutePath>:<line>` on the second line (no `file://` URI).
 
 ### 2.2 File path handling
 
 - [x] Shared file URI helper exists for absolute paths with line suffix (non-spec behavior).
-- [ ] Replace file URI usage with absolute path rendering per spec or update spec (if instructed).
+- [x] Replace file URI usage with absolute path rendering per spec or update spec (if instructed).
 
 **Definition of Done**
 
@@ -143,17 +143,22 @@
 - 2026-03-05: Read `internal/cli/analyze.go` - verified CLI output wiring and output path validation.
 - 2026-03-05: `go test ./internal/output -run TestRegistry` - passed.
 - 2026-03-05: `go test ./internal/cli -run TestParseAnalyzeInvalidFormat` - passed.
+- 2026-03-05: `go test ./internal/output -run TestWriteConsoleNoMatches` - passed.
+- 2026-03-05: `go test ./internal/output -run TestWriteConsoleOrdersAndGroupsMatches` - passed.
+- 2026-03-05: `go test ./internal/output -run TestFormatConsoleMatchLine` - passed.
+- 2026-03-05: `go test ./internal/output -run TestFormatConsoleMatchLineReturnsErrorWhenCwdMissing` - passed.
+- 2026-03-05: `go test ./internal/output -run TestGoldenConsoleOutput` - passed.
 
 ## Summary
 
 | Phase                                 | Status   |
 | ------------------------------------- | -------- |
 | Phase 1: Formatter core + registry    | Complete |
-| Phase 2: Console formatter alignment  | Partial  |
+| Phase 2: Console formatter alignment  | Complete |
 | Phase 3: JSON formatter alignment     | Partial  |
 | Phase 4: SARIF formatter verification | Complete |
 
-**Remaining effort:** Align console + JSON outputs with spec schemas.
+**Remaining effort:** Align JSON outputs with spec schema.
 
 ## Known Existing Work
 
