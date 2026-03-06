@@ -16,6 +16,7 @@
   - `bash scripts/quality.sh lint|test|coverage|security|arch`.
 - Coverage gate: default min 90% (`COVERAGE_MIN` override).
 - Run core tests with `go test ./...`.
+- Execute mutation testing with `bash scripts/quality.sh mutation` ONLY in final stages of the task development. **NEVER** execute mutation testing during the Test Driven Development process.
 
 ## Build and Run
 

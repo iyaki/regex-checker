@@ -88,7 +88,7 @@ bash scripts/quality.sh go-arch-lint
 ### CI coverage
 
 - `/.github/workflows/quality.yml` runs lint, security, and architecture checks.
-- `/.github/workflows/quality-local.yml` installs all tools and runs `scripts/quality.sh all` on demand.
+- `/.github/workflows/quality.yml` runs mutation testing via `scripts/quality.sh mutation`.
 
 ## Validation Rules
 
@@ -149,7 +149,7 @@ bash scripts/quality.sh go-arch-lint
 
 ### Mutation testing
 
-- Enforced via `go-mutesting` on local quality runs.
+- Enforced via `go-mutesting` on local quality runs, pre-commit hooks, and CI.
 - Minimum mutation score default: `0.8` (override with `MUTATION_SCORE_MIN`).
 - Targets default to `./...` (override with `MUTATION_TARGETS`).
 

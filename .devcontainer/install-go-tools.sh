@@ -13,5 +13,5 @@ mkdir -p "$GOBIN"
 curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.10.1
 go install golang.org/x/vuln/cmd/govulncheck@latest
 go install github.com/fe3dback/go-arch-lint@latest
-# go install -v github.com/avito-tech/go-mutesting/...
+go install github.com/avito-tech/go-mutesting/cmd/go-mutesting@latest
 go install github.com/evilmartians/lefthook/v2@v2.1.2

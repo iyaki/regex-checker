@@ -3,6 +3,7 @@
 set -euo pipefail
 
 mode="${1:-all}"
+global_targets="$(echo "${2:-}" | tr -d '"')"
 
 require_cmd() {
 	if ! command -v "$1" >/dev/null 2>&1; then
@@ -81,7 +82,11 @@ run_mutation_testing() {
 	output_file="$(mktemp -t quality-mutesting.XXXXXX)"
 
 	local targets
-	targets="${MUTATION_TARGETS:-./...}"
+	targets="${global_targets:-}"
+	if [ -z "$targets" ]; then
+		targets="${MUTATION_TARGETS:-./...}"
+	fi
+
 	if ! go-mutesting $targets | tee "$output_file"; then
 		rm -f "$output_file" report.json go-mutesting-report.html
 		exit 1
@@ -106,7 +111,6 @@ run_mutation_testing() {
 
 run_test() {
 	run_test_coverage
-	# run_mutation_testing
 }
 
 run_govulncheck() {
