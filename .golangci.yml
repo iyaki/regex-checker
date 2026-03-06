@@ -4,10 +4,6 @@ run:
   timeout: 5m
   tests: true
 
-output:
-  sort-results: true
-
-linters-settings: {}
 #   gocyclo:
 #     min-complexity: 15
 #   govet:
@@ -43,4 +39,3 @@ linters:
 issues:
   max-same-issues: 0
   max-issues-per-linter: 0
-  exclude-use-default: false
