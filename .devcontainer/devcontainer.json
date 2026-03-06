@@ -37,6 +37,11 @@
 			"source": "${localWorkspaceFolder}/.devcontainer/pull-git-lfs-artifacts-override.sh",
 			"target": "/usr/local/share/pull-git-lfs-artifacts.sh",
 			"type": "bind"
+		},
+		{
+			"source": "${localWorkspaceFolderBasename}-gopath",
+			"target": "/go",
+			"type": "volume"
 		}
 	],
 
@@ -104,7 +109,7 @@
 		"Install npm packages": "npm install",
 		"Setup agent browser": "agent-browser install --with-deps",
 		"Install go tools": "/bin/bash .devcontainer/install-go-tools.sh",
-		"Setup lefthook": "lefthook install",
+		"Setup lefthook": "/go/bin/lefthook install",
 		"Install entire": "/bin/bash .devcontainer/setup-entire.sh"
 	},
 
