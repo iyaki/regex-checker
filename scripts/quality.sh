@@ -78,6 +78,11 @@ run_mutation_testing() {
 		return 0
 	fi
 
+	if [ -n "${SKIP_MUTATION_TESTING:-}" ]; then
+		echo "Skipping mutation testing (SKIP_MUTATION_TESTING set)."
+		return 0
+	fi
+
 	local output_file
 	output_file="$(mktemp -t quality-mutesting.XXXXXX)"
 

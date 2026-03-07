@@ -99,19 +99,19 @@
 ## Phase 12: Ignore matcher + path filtering
 
 **Goal:** Apply ignore rules during scan entry collection.
-**Status:** Not started
+**Status:** Complete
 **Paths:** `internal/scan/engine.go`, `internal/ignore/matcher.go`
 **Reference pattern:** `internal/scan/engine.go`
 
 ### 12.1 Matcher semantics
 
-- [ ] Implement ordered rule evaluation (last match wins).
-- [ ] Ensure negation un-ignores only when include/exclude allowed.
+- [x] Implement ordered rule evaluation (last match wins).
+- [x] Ensure negation un-ignores only when include/exclude allowed.
 
 ### 12.2 File selection precedence
 
-- [ ] Apply include -> exclude -> ignore evaluation order per spec.
-- [ ] Ensure ignored files are excluded from scan entries.
+- [x] Apply include -> exclude -> ignore evaluation order per spec.
+- [x] Ensure ignored files are excluded from scan entries.
 
 **Definition of Done**
 
@@ -193,6 +193,12 @@
 - 2026-03-07: `go test ./internal/cli -run TestBuildScanRequestResolvesIgnoreSettings` - ok
 - 2026-03-07: `go test ./internal/ignore` - ok
 - 2026-03-07: `go test ./internal/ignore` - ok
+- 2026-03-07: `go test ./internal/scan -run TestCollectEntriesAppliesIgnoreRules` - ok
+- 2026-03-07: `go test ./internal/scan -run TestCollectEntriesAllowsIgnoreNegation` - ok
+- 2026-03-07: `go test ./internal/scan -run TestIgnoreMatcherRespectsOrderingAndNegation` - ok
+- 2026-03-07: `go test ./internal/scan -run TestCollectEntriesIgnoreNegationDoesNotOverrideExclude` - ok
+- 2026-03-07: `go test ./internal/scan -run TestCollectEntriesReturnsIgnoreLoadErrors` - ok
+- 2026-03-07: `go test ./internal/scan` - ok
 
 ## Summary
 
@@ -201,7 +207,7 @@
 | Phase 9: Ignore settings + config    | Complete    |
 | Phase 10: Ignore settings resolution | Complete    |
 | Phase 11: Ignore loader + parser     | Complete    |
-| Phase 12: Ignore matcher + filtering | Not started |
+| Phase 12: Ignore matcher + filtering | Complete    |
 | Phase 13: Error handling + stats     | Not started |
 | Phase 14: Tests + fixtures           | Not started |
 

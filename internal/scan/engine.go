@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/iyaki/reglint/internal/ignore"
 	"github.com/iyaki/reglint/internal/rules"
 )
 
@@ -26,7 +27,13 @@ const (
 	captureIndexPairSize = 2
 )
 
-func collectFiles(roots []string, include []string, exclude []string, maxFileSizeBytes int64) ([]string, int, error) {
+func collectFiles(
+	roots []string,
+	include []string,
+	exclude []string,
+	matcher []ignore.IgnoreRule,
+	maxFileSizeBytes int64,
+) ([]string, int, error) {
 	var files []string
 	skipped := 0
 
@@ -49,7 +56,15 @@ func collectFiles(roots []string, include []string, exclude []string, maxFileSiz
 				return nil
 			}
 
-			selected, fileSkipped, err := evaluateFile(path, relPath, entry, include, exclude, maxFileSizeBytes)
+			selected, fileSkipped, err := evaluateFile(
+				path,
+				relPath,
+				entry,
+				include,
+				exclude,
+				matcher,
+				maxFileSizeBytes,
+			)
 			if err != nil {
 				return err
 			}
@@ -140,7 +155,12 @@ func collectScanEntries(request Request) ([]fileEntry, int, []string, []string, 
 		return nil, 0, nil, nil, errors.New("include patterns required")
 	}
 
-	entries, skipped, err := collectEntries(request.Roots, include, exclude, request.MaxFileSizeBytes)
+	matcherByRoot, err := loadIgnoreRules(request)
+	if err != nil {
+		return nil, 0, nil, nil, err
+	}
+
+	entries, skipped, err := collectEntries(request.Roots, include, exclude, matcherByRoot, request.MaxFileSizeBytes)
 	if err != nil {
 		return nil, 0, nil, nil, err
 	}
@@ -197,6 +217,16 @@ func scanEntries(entries []fileEntry, compiled []compiledRule, concurrency int) 
 	}
 
 	return matches, filesScanned, filesSkipped, nil
+}
+
+func matcherForRoot(matcherByRoot map[string][]ignore.IgnoreRule, root string) []ignore.IgnoreRule {
+	if matcherByRoot == nil {
+		return nil
+	}
+
+	root = filepath.Clean(root)
+
+	return matcherByRoot[root]
 }
 
 func scanEntriesSequential(entries []fileEntry, compiled []compiledRule) ([]Match, int, int, error) {
@@ -290,13 +320,15 @@ func collectEntries(
 	roots []string,
 	include []string,
 	exclude []string,
+	matcherByRoot map[string][]ignore.IgnoreRule,
 	maxFileSizeBytes int64,
 ) ([]fileEntry, int, error) {
 	entries := make([]fileEntry, 0)
 	skipped := 0
 
 	for _, root := range roots {
-		fileEntries, fileSkipped, isFile, err := collectFileEntry(root, include, exclude, maxFileSizeBytes)
+		matcher := matcherForRoot(matcherByRoot, root)
+		fileEntries, fileSkipped, isFile, err := collectFileEntry(root, include, exclude, matcher, maxFileSizeBytes)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -307,7 +339,7 @@ func collectEntries(
 			continue
 		}
 
-		files, fileSkipped, err := collectFiles([]string{root}, include, exclude, maxFileSizeBytes)
+		files, fileSkipped, err := collectFiles([]string{root}, include, exclude, matcher, maxFileSizeBytes)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -332,6 +364,7 @@ func collectFileEntry(
 	root string,
 	include []string,
 	exclude []string,
+	matcher []ignore.IgnoreRule,
 	maxFileSizeBytes int64,
 ) ([]fileEntry, int, bool, error) {
 	info, err := os.Stat(root)
@@ -355,6 +388,7 @@ func collectFileEntry(
 		entry,
 		include,
 		exclude,
+		matcher,
 		maxFileSizeBytes,
 	)
 	if err != nil {
@@ -533,6 +567,7 @@ func evaluateFile(
 	entry os.DirEntry,
 	include []string,
 	exclude []string,
+	matcher []ignore.IgnoreRule,
 	maxFileSizeBytes int64,
 ) (bool, bool, error) {
 	match, err := matchesPath(relPath, include, exclude)
@@ -541,6 +576,15 @@ func evaluateFile(
 	}
 	if !match {
 		return false, false, nil
+	}
+	if matcher != nil {
+		ignored, err := ignore.Match(matcher, relPath, entry.IsDir())
+		if err != nil {
+			return false, false, err
+		}
+		if ignored {
+			return false, false, nil
+		}
 	}
 
 	skip, err := shouldSkipFile(path, entry, maxFileSizeBytes)

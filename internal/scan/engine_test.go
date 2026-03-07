@@ -23,7 +23,13 @@ func TestCollectFilesFiltersByIncludeExclude(t *testing.T) {
 	writeFile(t, filepath.Join(root, "docs", "notes.md"))
 	writeFile(t, filepath.Join(root, "README.md"))
 
-	files, skipped, err := collectFiles([]string{root}, []string{"src/**", "docs/**"}, []string{"**/vendor/**"}, 1024)
+	files, skipped, err := collectFiles(
+		[]string{root},
+		[]string{"src/**", "docs/**"},
+		[]string{"**/vendor/**"},
+		nil,
+		1024,
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +90,7 @@ func TestCollectFilesSkipsLargeFiles(t *testing.T) {
 	writeFileWithContent(t, filepath.Join(root, "src", "small.txt"), "data")
 	writeFileWithContent(t, filepath.Join(root, "src", "large.txt"), "0123456789")
 
-	files, skipped, err := collectFiles([]string{root}, []string{"src/**"}, nil, 4)
+	files, skipped, err := collectFiles([]string{root}, []string{"src/**"}, nil, nil, 4)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,7 +111,7 @@ func TestCollectFilesSkipsBinaryFiles(t *testing.T) {
 	writeFileWithContent(t, filepath.Join(root, "src", "text.txt"), "hello")
 	writeFileBytes(t, filepath.Join(root, "src", "binary.bin"), []byte{0x00, 0x01, 0x02})
 
-	files, skipped, err := collectFiles([]string{root}, []string{"src/**"}, nil, 1024)
+	files, skipped, err := collectFiles([]string{root}, []string{"src/**"}, nil, nil, 1024)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -463,6 +469,7 @@ func TestCollectEntriesKeepsRootOrderForSameRelPath(t *testing.T) {
 		[]string{rootB, rootA},
 		[]string{"**/*"},
 		nil,
+		nil,
 		1024,
 	)
 	if err != nil {
@@ -485,7 +492,7 @@ func TestCollectEntriesErrorsOnInvalidInclude(t *testing.T) {
 	root := t.TempDir()
 	writeFileWithContent(t, filepath.Join(root, "sample.txt"), "data")
 
-	_, _, err := collectEntries([]string{root}, []string{"["}, nil, 1024)
+	_, _, err := collectEntries([]string{root}, []string{"["}, nil, nil, 1024)
 	if err == nil {
 		t.Fatal("expected error for invalid include pattern")
 	}
@@ -496,7 +503,7 @@ func TestCollectFileEntryReturnsDirMetadata(t *testing.T) {
 
 	root := t.TempDir()
 
-	entries, skipped, isFile, err := collectFileEntry(root, []string{"**/*"}, nil, 1024)
+	entries, skipped, isFile, err := collectFileEntry(root, []string{"**/*"}, nil, nil, 1024)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -518,7 +525,7 @@ func TestCollectFileEntrySkipsNonMatchingInclude(t *testing.T) {
 	path := filepath.Join(root, "sample.txt")
 	writeFileWithContent(t, path, "content")
 
-	entries, skipped, isFile, err := collectFileEntry(path, []string{"src/**"}, nil, 1024)
+	entries, skipped, isFile, err := collectFileEntry(path, []string{"src/**"}, nil, nil, 1024)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -548,7 +555,7 @@ func TestEvaluateFileSkipsOnUnreadableFile(t *testing.T) {
 		t.Fatalf("failed to remove file: %v", err)
 	}
 
-	selected, skipped, err := evaluateFile(path, "sample.txt", entry, []string{"**/*"}, nil, 1024)
+	selected, skipped, err := evaluateFile(path, "sample.txt", entry, []string{"**/*"}, nil, nil, 1024)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
