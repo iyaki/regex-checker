@@ -479,6 +479,9 @@ func sortMatches(matches []Match) {
 		if left.FilePath != right.FilePath {
 			return left.FilePath < right.FilePath
 		}
+		if left.Root != right.Root {
+			return left.Root < right.Root
+		}
 		if left.Line != right.Line {
 			return left.Line < right.Line
 		}
@@ -583,7 +586,7 @@ func evaluateFile(
 			return false, false, err
 		}
 		if ignored {
-			return false, false, nil
+			return false, true, nil
 		}
 	}
 

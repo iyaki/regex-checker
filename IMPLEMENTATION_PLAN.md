@@ -161,7 +161,7 @@
 - [x] Nested `.reglintignore` + `!` negation re-includes paths.
 - [x] `--no-ignore-files` scans ignored files.
 - [x] Invalid ignore pattern errors with `<source>:<line>`.
-- [ ] Deterministic ordering with same inputs.
+- [x] Deterministic ordering with same inputs.
 
 ### 14.2 Config + CLI tests
 
@@ -201,19 +201,23 @@
 - 2026-03-07: `go test ./internal/scan -run TestCollectEntriesCountsIgnoredFilesAsSkipped` - ok
 - 2026-03-07: `go test ./internal/scan` - ok
 - 2026-03-07: `go test ./internal/scan -run "TestCollectEntriesAllowsNestedReglintIgnoreNegation|TestCollectEntriesNoIgnoreFilesScansIgnoredPaths"` - ok
+- 2026-03-07: `go test ./internal/scan -run TestSortMatchesOrdersByRootForSameFilePath` - ok
+- 2026-03-07: `go test ./internal/scan` - ok
+- 2026-03-07: `go test ./internal/scan -run TestRunUsesConcurrencyForFileReads` - ok
+- 2026-03-07: `go test ./internal/scan` - ok
 
 ## Summary
 
-| Phase                                | Status      |
-| ------------------------------------ | ----------- |
-| Phase 9: Ignore settings + config    | Complete    |
-| Phase 10: Ignore settings resolution | Complete    |
-| Phase 11: Ignore loader + parser     | Complete    |
-| Phase 12: Ignore matcher + filtering | Complete    |
-| Phase 13: Error handling + stats     | Complete    |
-| Phase 14: Tests + fixtures           | In progress |
+| Phase                                | Status   |
+| ------------------------------------ | -------- |
+| Phase 9: Ignore settings + config    | Complete |
+| Phase 10: Ignore settings resolution | Complete |
+| Phase 11: Ignore loader + parser     | Complete |
+| Phase 12: Ignore matcher + filtering | Complete |
+| Phase 13: Error handling + stats     | Complete |
+| Phase 14: Tests + fixtures           | Complete |
 
-**Remaining effort:** Remaining phases pending; ignore-files feature still in progress.
+**Remaining effort:** Ignore-files phases complete; verify overall project scope before new work.
 
 ## Known Existing Work
 

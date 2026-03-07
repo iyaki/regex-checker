@@ -126,7 +126,6 @@ func TestCollectFilesSkipsBinaryFiles(t *testing.T) {
 }
 
 func TestRunUsesConcurrencyForFileReads(t *testing.T) {
-	t.Parallel()
 	root := t.TempDir()
 	writeFileWithContent(t, filepath.Join(root, "a.txt"), "secret")
 	writeFileWithContent(t, filepath.Join(root, "b.txt"), "secret")
@@ -415,6 +414,35 @@ func TestSortMatchesOrdersBySeverityAndMessage(t *testing.T) {
 	}
 	if matches[1].Message != "Alpha" || matches[2].Message != "Zulu" {
 		t.Fatalf("unexpected message ordering: %s, %s", matches[1].Message, matches[2].Message)
+	}
+}
+
+func TestSortMatchesOrdersByRootForSameFilePath(t *testing.T) {
+	t.Parallel()
+
+	matches := []Match{
+		{
+			Message:  "Same",
+			Severity: "warning",
+			FilePath: "same.txt",
+			Root:     "root-b",
+			Line:     1,
+			Column:   1,
+		},
+		{
+			Message:  "Same",
+			Severity: "warning",
+			FilePath: "same.txt",
+			Root:     "root-a",
+			Line:     1,
+			Column:   1,
+		},
+	}
+
+	sortMatches(matches)
+
+	if matches[0].Root != "root-a" {
+		t.Fatalf("expected root ordering, got %s", matches[0].Root)
 	}
 }
 
