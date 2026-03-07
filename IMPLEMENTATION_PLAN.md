@@ -1,6 +1,6 @@
 # Implementation Plan (ignore-files)
 
-**Status:** Ignore files support in progress (1/6 phases complete)
+**Status:** Ignore files support in progress (2/6 phases complete)
 **Last Updated:** 2026-03-07
 **Primary Specs:** `specs/ignore-files.md`, `specs/configuration.md`, `specs/cli-analyze.md`, `specs/data-model.md`
 
@@ -71,15 +71,15 @@
 ## Phase 11: Ignore file loader + parser
 
 **Goal:** Load, parse, and normalize ignore rules in deterministic order.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `internal/ignore/loader.go`, `internal/ignore/parser.go`, `internal/ignore/matcher.go`
 **Reference pattern:** `internal/scan/engine.go`
 
 ### 11.1 Ignore loader
 
-- [ ] Walk directories in lexical order per scan root.
-- [ ] Discover ignore files using ordered `IgnoreSettings.Files`.
-- [ ] Normalize line endings and read UTF-8 text.
+- [x] Walk directories in lexical order per scan root.
+- [x] Discover ignore files using ordered `IgnoreSettings.Files`.
+- [x] Normalize line endings and read UTF-8 text.
 
 ### 11.2 Ignore parser
 
@@ -192,6 +192,7 @@
 - 2026-03-07: `go test ./internal/config ./internal/cli` - ok
 - 2026-03-07: `go test ./internal/cli -run TestBuildScanRequestResolvesIgnoreSettings` - ok
 - 2026-03-07: `go test ./internal/ignore` - ok
+- 2026-03-07: `go test ./internal/ignore` - ok
 
 ## Summary
 
@@ -199,7 +200,7 @@
 | ------------------------------------ | ----------- |
 | Phase 9: Ignore settings + config    | Complete    |
 | Phase 10: Ignore settings resolution | Complete    |
-| Phase 11: Ignore loader + parser     | In progress |
+| Phase 11: Ignore loader + parser     | Complete    |
 | Phase 12: Ignore matcher + filtering | Not started |
 | Phase 13: Error handling + stats     | Not started |
 | Phase 14: Tests + fixtures           | Not started |
