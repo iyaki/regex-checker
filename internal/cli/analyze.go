@@ -311,11 +311,14 @@ func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string)
 
 	applyRuleSetOverrides(cfg, &effective)
 
+	ignoreSettings := resolveIgnoreSettings(effective)
+
 	request := scan.Request{
 		Roots:            append([]string{}, cfg.Roots...),
 		Rules:            buildEffectiveRules(cfg, effective),
 		Include:          append([]string{}, effective.Include...),
 		Exclude:          append([]string{}, effective.Exclude...),
+		Ignore:           ignoreSettings,
 		MaxFileSizeBytes: cfg.MaxFileSizeBytes,
 		Concurrency:      resolveConcurrency(cfg, effective.Concurrency),
 	}
@@ -539,6 +542,21 @@ func resolveFailOn(failOn *string) string {
 	}
 
 	return *failOn
+}
+
+func resolveIgnoreSettings(effective rules.RuleSet) scan.IgnoreSettings {
+	settings := scan.IgnoreSettings{
+		Enabled: true,
+		Files:   []string{".ignore", ".reglintignore"},
+	}
+	if effective.IgnoreFilesEnabled != nil {
+		settings.Enabled = *effective.IgnoreFilesEnabled
+	}
+	if len(effective.IgnoreFiles) > 0 {
+		settings.Files = append([]string{}, effective.IgnoreFiles...)
+	}
+
+	return settings
 }
 
 func wasFlagProvided(flagSet *flag.FlagSet, name string) bool {

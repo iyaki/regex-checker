@@ -9,8 +9,15 @@ type Request struct {
 	Rules            []rules.Rule
 	Include          []string
 	Exclude          []string
+	Ignore           IgnoreSettings
 	MaxFileSizeBytes int64
 	Concurrency      int
+}
+
+// IgnoreSettings defines ignore file behavior for a scan.
+type IgnoreSettings struct {
+	Enabled bool
+	Files   []string
 }
 
 // Match represents a single rule match.

@@ -1,6 +1,6 @@
 # Implementation Plan (ignore-files)
 
-**Status:** Ignore files support not implemented (0/6 phases complete)
+**Status:** Ignore files support in progress (1/6 phases complete)
 **Last Updated:** 2026-03-07
 **Primary Specs:** `specs/ignore-files.md`, `specs/configuration.md`, `specs/cli-analyze.md`, `specs/data-model.md`
 
@@ -45,19 +45,19 @@
 ## Phase 10: Ignore settings resolution
 
 **Goal:** Resolve effective ignore settings with default, RuleSet, and CLI overrides.
-**Status:** Not started
+**Status:** Complete
 **Paths:** `internal/cli/analyze.go`, `internal/rules/model.go`, `internal/scan/model.go`
 **Reference pattern:** `internal/cli/analyze.go`
 
 ### 10.1 Effective settings model
 
-- [ ] Add `IgnoreSettings` to scan request model.
-- [ ] Provide defaults (`enabled=true`, `files=['.ignore', '.reglintignore']`).
+- [x] Add `IgnoreSettings` to scan request model.
+- [x] Provide defaults (`enabled=true`, `files=['.ignore', '.reglintignore']`).
 
 ### 10.2 Precedence logic
 
-- [ ] Apply RuleSet overrides for `ignoreFilesEnabled` and `ignoreFiles`.
-- [ ] Apply `--no-ignore-files` to disable ignore support.
+- [x] Apply RuleSet overrides for `ignoreFilesEnabled` and `ignoreFiles`.
+- [x] Apply `--no-ignore-files` to disable ignore support.
 
 **Definition of Done**
 
@@ -182,27 +182,28 @@
 - 2026-03-07: Read `specs/README.md` - verified spec index and scope references.
 - 2026-03-07: Read `specs/ignore-files.md` - documented ignore file requirements and data model.
 - 2026-03-07: Read `specs/configuration.md`, `specs/cli-analyze.md`, `specs/data-model.md`, `specs/testing-and-validations.md` - confirmed related schema and validation expectations.
-- 2026-03-07: Read `internal/scan/engine.go` - verified include/exclude filtering exists, no ignore support.
-- 2026-03-07: Read `internal/scan/model.go` - scan request has no ignore settings.
-- 2026-03-07: Read `internal/config/model.go` and `internal/config/rules.go` - no ignore settings in RuleSet.
-- 2026-03-07: Read `internal/cli/analyze.go` and `internal/cli/help.go` - no ignore flags or help entries.
+- 2026-03-07: Read `internal/scan/engine.go` - verified include/exclude filtering exists, no ignore support yet.
+- 2026-03-07: Read `internal/scan/model.go` - scan request had no ignore settings before Phase 10 work.
+- 2026-03-07: Read `internal/config/model.go` and `internal/config/rules.go` - ignore settings already present in RuleSet.
+- 2026-03-07: Read `internal/cli/analyze.go` and `internal/cli/help.go` - ignore flags were already present in CLI.
 - 2026-03-07: Searched `internal/**/ignore*` - ignore package does not exist yet.
 - 2026-03-07: `git log --oneline -- specs` - reviewed recent spec change history.
 - 2026-03-07: `git log -n 10 --oneline -- specs/ignore-files.md` - reviewed ignore spec change history.
 - 2026-03-07: `go test ./internal/config ./internal/cli` - ok
+- 2026-03-07: `go test ./internal/cli -run TestBuildScanRequestResolvesIgnoreSettings` - ok
 
 ## Summary
 
 | Phase                                | Status      |
 | ------------------------------------ | ----------- |
 | Phase 9: Ignore settings + config    | Complete    |
-| Phase 10: Ignore settings resolution | Not started |
+| Phase 10: Ignore settings resolution | Complete    |
 | Phase 11: Ignore loader + parser     | Not started |
 | Phase 12: Ignore matcher + filtering | Not started |
 | Phase 13: Error handling + stats     | Not started |
 | Phase 14: Tests + fixtures           | Not started |
 
-**Remaining effort:** All phases pending; ignore-files feature not implemented.
+**Remaining effort:** Remaining phases pending; ignore-files feature still in progress.
 
 ## Known Existing Work
 

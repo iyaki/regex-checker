@@ -110,6 +110,29 @@ func TestBuildScanRequestUsesCLIConcurrencyWhenSet(t *testing.T) {
 	}
 }
 
+func TestBuildScanRequestResolvesIgnoreSettings(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		IgnoreFilesEnabled: boolPtr(false),
+		IgnoreFiles:        []string{".customignore"},
+		Rules:              []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+		NoIgnoreFiles:    true,
+	}
+
+	request, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Ignore.Enabled {
+		t.Fatal("expected ignore files to be disabled")
+	}
+	assertStringSlice(t, "ignore files", request.Ignore.Files, []string{".customignore"})
+}
+
 func stringPtr(value string) *string {
 	return &value
 }
