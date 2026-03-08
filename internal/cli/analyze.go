@@ -58,14 +58,14 @@ func (s *stringSlice) Set(value string) error {
 
 // HandleAnalyze executes the analyze command.
 func HandleAnalyze(args []string, out *bytes.Buffer) int {
-	result, failOn, formats, ruleset, cfg, err := runAnalyze(args)
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze(args)
 	if err != nil {
 		writeError(out, err)
 
 		return exitCodeError
 	}
 
-	if err := renderOutputs(formats, ruleset, cfg, result, out); err != nil {
+	if err := renderOutputs(formats, ruleset, cfg, consoleColors, result, out); err != nil {
 		writeError(out, err)
 
 		return exitCodeError
@@ -306,12 +306,13 @@ func isValidSeverity(value string) bool {
 }
 
 // BuildScanRequest resolves overrides and builds a scan request.
-func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string) {
+func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string, output.ConsoleColorSettings) {
 	effective := ruleSet.ToRules()
 
 	applyRuleSetOverrides(cfg, &effective)
 
 	ignoreSettings := resolveIgnoreSettings(effective)
+	consoleColorSettings := resolveConsoleColorSettings(effective)
 
 	request := scan.Request{
 		Roots:            append([]string{}, cfg.Roots...),
@@ -323,35 +324,44 @@ func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string)
 		Concurrency:      resolveConcurrency(cfg, effective.Concurrency),
 	}
 
-	return request, resolveFailOn(effective.FailOn)
+	return request, resolveFailOn(effective.FailOn), consoleColorSettings
 }
 
 func writeError(out *bytes.Buffer, err error) {
 	_, _ = fmt.Fprintf(out, "%s\n", err.Error())
 }
 
-func runAnalyze(args []string) (scan.Result, string, []string, []rules.Rule, Config, error) {
+func runAnalyze(
+	args []string,
+) (scan.Result, string, []string, []rules.Rule, Config, output.ConsoleColorSettings, error) {
 	cfg, err := ParseAnalyzeArgs(args)
 	if err != nil {
-		return scan.Result{}, "", nil, nil, Config{}, err
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
 
 	ruleSet, err := config.LoadRuleSet(cfg.ConfigPath)
 	if err != nil {
-		return scan.Result{}, "", nil, nil, Config{}, err
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
 
-	request, failOn := BuildScanRequest(cfg, ruleSet)
+	request, failOn, consoleColorSettings := BuildScanRequest(cfg, ruleSet)
 	result, err := scan.Run(request)
 	if err != nil {
-		return scan.Result{}, "", nil, nil, Config{}, err
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
 
-	return result, failOn, cfg.Formats, request.Rules, cfg, nil
+	return result, failOn, cfg.Formats, request.Rules, cfg, consoleColorSettings, nil
 }
 
-func renderOutputs(formats []string, ruleset []rules.Rule, cfg Config, result scan.Result, out *bytes.Buffer) error {
-	registry, err := outputRegistry(ruleset)
+func renderOutputs(
+	formats []string,
+	ruleset []rules.Rule,
+	cfg Config,
+	consoleColors output.ConsoleColorSettings,
+	result scan.Result,
+	out *bytes.Buffer,
+) error {
+	registry, err := outputRegistry(ruleset, consoleColors)
 	if err != nil {
 		return err
 	}
@@ -371,9 +381,9 @@ func renderOutputs(formats []string, ruleset []rules.Rule, cfg Config, result sc
 
 var outputRegistry = defaultOutputRegistry
 
-func defaultOutputRegistry(ruleset []rules.Rule) (*output.Registry, error) {
+func defaultOutputRegistry(ruleset []rules.Rule, consoleColors output.ConsoleColorSettings) (*output.Registry, error) {
 	return output.NewRegistry(
-		output.ConsoleFormatter{},
+		output.ConsoleFormatter{ColorSettings: consoleColors},
 		output.JSONFormatter{},
 		output.SARIFFormatter{Rules: ruleset},
 	)
@@ -542,6 +552,24 @@ func resolveFailOn(failOn *string) string {
 	}
 
 	return *failOn
+}
+
+func resolveConsoleColorSettings(effective rules.RuleSet) output.ConsoleColorSettings {
+	settings := output.ConsoleColorSettings{
+		Enabled: true,
+		Source:  output.ConsoleColorSourceDefault,
+	}
+	if effective.ConsoleColorsEnabled != nil {
+		settings.Enabled = *effective.ConsoleColorsEnabled
+		settings.Source = output.ConsoleColorSourceConfig
+	}
+
+	if envValue, ok := os.LookupEnv("NO_COLOR"); ok && envValue != "" {
+		settings.Enabled = false
+		settings.Source = output.ConsoleColorSourceEnv
+	}
+
+	return settings
 }
 
 func resolveIgnoreSettings(effective rules.RuleSet) scan.IgnoreSettings {

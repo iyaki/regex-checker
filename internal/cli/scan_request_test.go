@@ -33,7 +33,7 @@ func TestBuildScanRequestOverridesIncludeExcludeAndFailOn(t *testing.T) {
 		MaxFileSizeBytes: 99,
 	}
 
-	request, failOn := cli.BuildScanRequest(cfg, ruleSet)
+	request, failOn, _ := cli.BuildScanRequest(cfg, ruleSet)
 
 	assertEqualString(t, "fail-on severity", failOn, "error")
 	assertStringSlice(t, "include override", request.Include, []string{"**/*.go"})
@@ -57,7 +57,7 @@ func TestBuildScanRequestUsesRuleSetDefaultsWithoutOverrides(t *testing.T) {
 		MaxFileSizeBytes: 10,
 	}
 
-	request, failOn := cli.BuildScanRequest(cfg, ruleSet)
+	request, failOn, _ := cli.BuildScanRequest(cfg, ruleSet)
 
 	expectedExclude := []string{"**/.git/**", "**/node_modules/**", "**/vendor/**"}
 	assertEqualString(t, "fail-on severity", failOn, "")
@@ -82,7 +82,7 @@ func TestBuildScanRequestUsesRuleSetConcurrencyWhenNotSetInCLI(t *testing.T) {
 		ConcurrencySet:   false,
 	}
 
-	request, _ := cli.BuildScanRequest(cfg, ruleSet)
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
 
 	if request.Concurrency != 7 {
 		t.Fatalf("expected concurrency 7, got %d", request.Concurrency)
@@ -103,7 +103,7 @@ func TestBuildScanRequestUsesCLIConcurrencyWhenSet(t *testing.T) {
 		ConcurrencySet:   true,
 	}
 
-	request, _ := cli.BuildScanRequest(cfg, ruleSet)
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
 
 	if request.Concurrency != 3 {
 		t.Fatalf("expected concurrency 3, got %d", request.Concurrency)
@@ -125,12 +125,106 @@ func TestBuildScanRequestResolvesIgnoreSettings(t *testing.T) {
 		NoIgnoreFiles:    true,
 	}
 
-	request, _ := cli.BuildScanRequest(cfg, ruleSet)
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
 
 	if request.Ignore.Enabled {
 		t.Fatal("expected ignore files to be disabled")
 	}
 	assertStringSlice(t, "ignore files", request.Ignore.Files, []string{".customignore"})
+}
+
+func TestBuildScanRequestUsesDefaultConsoleColorsWhenUnset(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+
+	ruleSet := config.RuleSet{
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	_, _, colorSettings := cli.BuildScanRequest(cfg, ruleSet)
+
+	if !colorSettings.Enabled {
+		t.Fatal("expected default console colors to be enabled")
+	}
+	if colorSettings.Source != "default" {
+		t.Fatalf("expected default color source, got %q", colorSettings.Source)
+	}
+}
+
+func TestBuildScanRequestUsesRuleSetConsoleColorsSetting(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+
+	consoleColorsEnabled := false
+	ruleSet := config.RuleSet{
+		ConsoleColorsEnabled: &consoleColorsEnabled,
+		Rules:                []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	_, _, colorSettings := cli.BuildScanRequest(cfg, ruleSet)
+
+	if colorSettings.Enabled {
+		t.Fatal("expected console colors to be disabled by ruleset")
+	}
+	if colorSettings.Source != "config" {
+		t.Fatalf("expected config color source, got %q", colorSettings.Source)
+	}
+}
+
+func TestBuildScanRequestNoColorEnvOverridesRuleSetConsoleColors(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	consoleColorsEnabled := true
+	ruleSet := config.RuleSet{
+		ConsoleColorsEnabled: &consoleColorsEnabled,
+		Rules:                []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	_, _, colorSettings := cli.BuildScanRequest(cfg, ruleSet)
+
+	if colorSettings.Enabled {
+		t.Fatal("expected console colors to be disabled by NO_COLOR")
+	}
+	if colorSettings.Source != "env" {
+		t.Fatalf("expected env color source, got %q", colorSettings.Source)
+	}
+}
+
+func TestBuildScanRequestEmptyNoColorDoesNotOverrideRuleSet(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+
+	consoleColorsEnabled := false
+	ruleSet := config.RuleSet{
+		ConsoleColorsEnabled: &consoleColorsEnabled,
+		Rules:                []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	_, _, colorSettings := cli.BuildScanRequest(cfg, ruleSet)
+
+	if colorSettings.Enabled {
+		t.Fatal("expected console colors to stay disabled by ruleset")
+	}
+	if colorSettings.Source != "config" {
+		t.Fatalf("expected config color source, got %q", colorSettings.Source)
+	}
 }
 
 func stringPtr(value string) *string {

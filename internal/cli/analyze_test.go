@@ -5,13 +5,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/iyaki/reglint/internal/cli"
 )
-
-var parseCwdMutex sync.Mutex
 
 func TestParseAnalyzeDefaults(t *testing.T) {
 	t.Parallel()
@@ -554,23 +551,12 @@ func TestParseAnalyzeRejectsOutSARIFWithMissingParent(t *testing.T) {
 }
 
 func TestParseAnalyzeAcceptsOutJSONInCurrentDir(t *testing.T) {
-	t.Parallel()
-	parseCwdMutex.Lock()
-	defer parseCwdMutex.Unlock()
-	current, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to read cwd: %v", err)
-	}
-	if err = os.Chdir(t.TempDir()); err != nil {
-		t.Fatalf("failed to change cwd: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(current)
-	})
-
 	configPath := writeTempConfig(t)
-	outputPath := "scan.json"
+	outputPath := "scan-parse-json.tmp"
 	cleanupFile(t, outputPath)
+	t.Cleanup(func() {
+		cleanupFile(t, outputPath)
+	})
 
 	_, parseErr := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "json", "--out-json", outputPath})
 	if parseErr != nil {
@@ -579,23 +565,12 @@ func TestParseAnalyzeAcceptsOutJSONInCurrentDir(t *testing.T) {
 }
 
 func TestParseAnalyzeAcceptsOutSARIFInCurrentDir(t *testing.T) {
-	t.Parallel()
-	parseCwdMutex.Lock()
-	defer parseCwdMutex.Unlock()
-	current, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to read cwd: %v", err)
-	}
-	if err = os.Chdir(t.TempDir()); err != nil {
-		t.Fatalf("failed to change cwd: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(current)
-	})
-
 	configPath := writeTempConfig(t)
-	outputPath := "scan.sarif"
+	outputPath := "scan-parse-sarif.tmp"
 	cleanupFile(t, outputPath)
+	t.Cleanup(func() {
+		cleanupFile(t, outputPath)
+	})
 
 	_, parseErr := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--format", "sarif", "--out-sarif", outputPath})
 	if parseErr != nil {

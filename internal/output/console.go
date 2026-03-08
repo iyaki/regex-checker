@@ -11,6 +11,34 @@ import (
 	"github.com/iyaki/reglint/internal/scan"
 )
 
+// Console color source markers used for precedence reporting.
+const (
+	ConsoleColorSourceDefault = "default"
+	ConsoleColorSourceConfig  = "config"
+	ConsoleColorSourceEnv     = "env"
+)
+
+// ConsoleColorSettings defines effective color controls for console output.
+type ConsoleColorSettings struct {
+	Enabled bool
+	Source  string
+}
+
+func defaultConsoleColorSettings() ConsoleColorSettings {
+	return ConsoleColorSettings{
+		Enabled: true,
+		Source:  ConsoleColorSourceDefault,
+	}
+}
+
+func normalizeConsoleColorSettings(settings ConsoleColorSettings) ConsoleColorSettings {
+	if settings.Source == "" {
+		return defaultConsoleColorSettings()
+	}
+
+	return settings
+}
+
 // WriteConsole renders a scan result to the provided writer.
 func WriteConsole(result scan.Result, out io.Writer) error {
 	matches := append([]scan.Match{}, result.Matches...)
@@ -50,8 +78,17 @@ func WriteConsole(result scan.Result, out io.Writer) error {
 	return err
 }
 
+// WriteConsoleWithSettings renders a scan result with explicit color settings.
+func WriteConsoleWithSettings(result scan.Result, settings ConsoleColorSettings, out io.Writer) error {
+	_ = normalizeConsoleColorSettings(settings)
+
+	return WriteConsole(result, out)
+}
+
 // ConsoleFormatter renders console output.
-type ConsoleFormatter struct{}
+type ConsoleFormatter struct {
+	ColorSettings ConsoleColorSettings
+}
 
 // Name returns the format identifier.
 func (ConsoleFormatter) Name() string {
@@ -59,8 +96,8 @@ func (ConsoleFormatter) Name() string {
 }
 
 // Write renders console output to the writer.
-func (ConsoleFormatter) Write(result scan.Result, out io.Writer) error {
-	return WriteConsole(result, out)
+func (f ConsoleFormatter) Write(result scan.Result, out io.Writer) error {
+	return WriteConsoleWithSettings(result, f.ColorSettings, out)
 }
 
 func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error {

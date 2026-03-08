@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/iyaki/reglint/internal/output"
@@ -16,7 +15,14 @@ import (
 	"github.com/iyaki/reglint/internal/scan"
 )
 
-var analyzeCwdMutex sync.Mutex
+func lockAnalyzeOutput(t *testing.T) {
+	t.Helper()
+
+	cwdMutex.Lock()
+	t.Cleanup(func() {
+		cwdMutex.Unlock()
+	})
+}
 
 func TestWriteJSONOutputRequiresPathForMultipleFormats(t *testing.T) {
 	t.Parallel()
@@ -68,12 +74,20 @@ func TestWriteSARIFOutputToStdout(t *testing.T) {
 
 func TestRenderOutputsWritesJSONFile(t *testing.T) {
 	t.Parallel()
+	lockAnalyzeOutput(t)
 
 	path := filepath.Join(t.TempDir(), "scan.json")
 	cfg := Config{Formats: []string{"json"}, OutJSON: path}
 	buffer := &bytes.Buffer{}
 
-	if err := renderOutputs(cfg.Formats, sampleRules(), cfg, scan.Result{}, buffer); err != nil {
+	if err := renderOutputs(
+		cfg.Formats,
+		sampleRules(),
+		cfg,
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		buffer,
+	); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if buffer.Len() != 0 {
@@ -90,12 +104,20 @@ func TestRenderOutputsWritesJSONFile(t *testing.T) {
 
 func TestRenderOutputsWritesSARIFFile(t *testing.T) {
 	t.Parallel()
+	lockAnalyzeOutput(t)
 
 	path := filepath.Join(t.TempDir(), "scan.sarif")
 	cfg := Config{Formats: []string{"sarif"}, OutSARIF: path}
 	buffer := &bytes.Buffer{}
 
-	if err := renderOutputs(cfg.Formats, sampleRules(), cfg, scan.Result{}, buffer); err != nil {
+	if err := renderOutputs(
+		cfg.Formats,
+		sampleRules(),
+		cfg,
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		buffer,
+	); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if buffer.Len() != 0 {
@@ -112,6 +134,7 @@ func TestRenderOutputsWritesSARIFFile(t *testing.T) {
 
 func TestRenderOutputsWritesConsole(t *testing.T) {
 	t.Parallel()
+	lockAnalyzeOutput(t)
 
 	result := scan.Result{
 		Matches: []scan.Match{{Message: "msg", Severity: "error", FilePath: "file.txt", Line: 1, Column: 1}},
@@ -125,7 +148,7 @@ func TestRenderOutputsWritesConsole(t *testing.T) {
 	cfg := Config{Formats: []string{"console"}}
 	buffer := &bytes.Buffer{}
 
-	if err := renderOutputs(cfg.Formats, sampleRules(), cfg, result, buffer); err != nil {
+	if err := renderOutputs(cfg.Formats, sampleRules(), cfg, output.ConsoleColorSettings{}, result, buffer); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(buffer.String(), "Summary:") {
@@ -135,10 +158,18 @@ func TestRenderOutputsWritesConsole(t *testing.T) {
 
 func TestRenderOutputsRejectsUnknownFormat(t *testing.T) {
 	t.Parallel()
+	lockAnalyzeOutput(t)
 
 	cfg := Config{Formats: []string{"bogus"}}
 
-	if err := renderOutputs(cfg.Formats, sampleRules(), cfg, scan.Result{}, &bytes.Buffer{}); err == nil {
+	if err := renderOutputs(
+		cfg.Formats,
+		sampleRules(),
+		cfg,
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		&bytes.Buffer{},
+	); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -161,12 +192,13 @@ func TestRunAnalyzeReturnsScanError(t *testing.T) {
 	config := "include:\n  - ''\nrules:\n  - message: 'hello'\n    regex: 'world'\n"
 	configPath := writeTempConfigFile(t, config)
 
-	result, failOn, formats, ruleset, cfg, err := runAnalyze([]string{"--config", configPath})
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{"--config", configPath})
 	_ = result
 	_ = failOn
 	_ = formats
 	_ = ruleset
 	_ = cfg
+	_ = consoleColors
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -183,12 +215,13 @@ func TestRunAnalyzeReturnsConfigLoadError(t *testing.T) {
 		_ = os.Chmod(configPath, 0o600)
 	})
 
-	result, failOn, formats, ruleset, cfg, err := runAnalyze([]string{"--config", configPath})
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{"--config", configPath})
 	_ = result
 	_ = failOn
 	_ = formats
 	_ = ruleset
 	_ = cfg
+	_ = consoleColors
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -207,8 +240,8 @@ func (e errorFormatter) Write(scan.Result, io.Writer) error {
 }
 
 func TestRunAnalyzeShortFlags(t *testing.T) {
-	analyzeCwdMutex.Lock()
-	defer analyzeCwdMutex.Unlock()
+	cwdMutex.Lock()
+	defer cwdMutex.Unlock()
 
 	config := "rules:\n  - message: 'hello'\n    regex: 'world'\n"
 	configPath := writeTempConfigFile(t, config)
@@ -224,25 +257,14 @@ func TestRunAnalyzeShortFlags(t *testing.T) {
 		_ = os.Chdir(current)
 	})
 
-	result, failOn, formats, ruleset, cfg, err := runAnalyze([]string{"-c", configPath, "-f", "console"})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if failOn != "" {
-		t.Fatalf("expected empty fail-on, got %q", failOn)
-	}
-	if len(formats) != 1 || formats[0] != "console" {
-		t.Fatalf("expected formats [console], got %v", formats)
-	}
-	if len(ruleset) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(ruleset))
-	}
-	if cfg.ConfigPath != configPath {
-		t.Fatalf("expected config path %q, got %q", configPath, cfg.ConfigPath)
-	}
-	if result.Stats.FilesScanned < 0 {
-		t.Fatalf("unexpected files scanned: %d", result.Stats.FilesScanned)
-	}
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{"-c", configPath, "-f", "console"})
+	assertNoError(t, err)
+	assertFailOnEmpty(t, failOn)
+	assertSingleConsoleFormat(t, formats)
+	assertRuleSetSize(t, ruleset, 1)
+	assertConfigPathValue(t, cfg.ConfigPath, configPath)
+	assertDefaultConsoleColors(t, consoleColors)
+	assertFilesScannedNonNegative(t, result.Stats.FilesScanned)
 }
 
 func TestWriteJSONFileFailsOnDirectory(t *testing.T) {
@@ -441,6 +463,7 @@ func TestRenderOutputsPropagatesFormatterError(t *testing.T) {
 
 func TestRenderOutputsSkipsUnknownFormatWrite(t *testing.T) {
 	t.Parallel()
+	lockAnalyzeOutput(t)
 
 	formatter := &captureFormatter{name: "console"}
 	registry, err := output.NewRegistry(formatter)
@@ -453,7 +476,14 @@ func TestRenderOutputsSkipsUnknownFormatWrite(t *testing.T) {
 	}
 
 	cfg := Config{Formats: []string{"bogus"}}
-	if err := renderOutputs(cfg.Formats, sampleRules(), cfg, scan.Result{}, &bytes.Buffer{}); err == nil {
+	if err := renderOutputs(
+		cfg.Formats,
+		sampleRules(),
+		cfg,
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		&bytes.Buffer{},
+	); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if formatter.written {
@@ -472,47 +502,68 @@ func (nilFormatter) Write(scan.Result, io.Writer) error {
 }
 
 func TestRenderOutputsReturnsErrorWhenResolveFails(t *testing.T) {
-	t.Parallel()
+	lockAnalyzeOutput(t)
 
-	outputRegistry = func([]rules.Rule) (*output.Registry, error) {
+	outputRegistry = func([]rules.Rule, output.ConsoleColorSettings) (*output.Registry, error) {
 		return output.NewRegistry(nilFormatter{})
 	}
 	t.Cleanup(func() {
 		outputRegistry = defaultOutputRegistry
 	})
 
-	if err := renderOutputs([]string{"missing"}, sampleRules(), Config{}, scan.Result{}, &bytes.Buffer{}); err == nil {
+	if err := renderOutputs(
+		[]string{"missing"},
+		sampleRules(),
+		Config{},
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		&bytes.Buffer{},
+	); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestRenderOutputsReturnsErrorWhenFormatterFails(t *testing.T) {
-	t.Parallel()
+	lockAnalyzeOutput(t)
 
 	currentRegistry := outputRegistry
-	outputRegistry = func([]rules.Rule) (*output.Registry, error) {
+	outputRegistry = func([]rules.Rule, output.ConsoleColorSettings) (*output.Registry, error) {
 		return output.NewRegistry(errorFormatter{name: "console"})
 	}
 	t.Cleanup(func() {
 		outputRegistry = currentRegistry
 	})
 
-	if err := renderOutputs([]string{"console"}, sampleRules(), Config{}, scan.Result{}, &bytes.Buffer{}); err == nil {
+	if err := renderOutputs(
+		[]string{"console"},
+		sampleRules(),
+		Config{},
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		&bytes.Buffer{},
+	); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestRenderOutputsReturnsErrorWhenRegistryFails(t *testing.T) {
-	t.Parallel()
+	lockAnalyzeOutput(t)
 
-	outputRegistry = func([]rules.Rule) (*output.Registry, error) {
+	outputRegistry = func([]rules.Rule, output.ConsoleColorSettings) (*output.Registry, error) {
 		return nil, errors.New("registry failed")
 	}
 	t.Cleanup(func() {
 		outputRegistry = defaultOutputRegistry
 	})
 
-	if err := renderOutputs([]string{"console"}, sampleRules(), Config{}, scan.Result{}, &bytes.Buffer{}); err == nil {
+	if err := renderOutputs(
+		[]string{"console"},
+		sampleRules(),
+		Config{},
+		output.ConsoleColorSettings{},
+		scan.Result{},
+		&bytes.Buffer{},
+	); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -562,6 +613,58 @@ func TestRenderOutputsReturnsErrorWhenRegistrySetupFails(t *testing.T) {
 	}
 }
 
+func TestDefaultOutputRegistryUsesConsoleColorSettings(t *testing.T) {
+	t.Parallel()
+	lockAnalyzeOutput(t)
+
+	settings := output.ConsoleColorSettings{Enabled: false, Source: output.ConsoleColorSourceConfig}
+	registry, err := defaultOutputRegistry(sampleRules(), settings)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	formatter, err := registry.ResolveName("console")
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+
+	consoleFormatter, ok := formatter.(output.ConsoleFormatter)
+	if !ok {
+		t.Fatalf("expected console formatter type, got %T", formatter)
+	}
+	if consoleFormatter.ColorSettings != settings {
+		t.Fatalf("expected settings %+v, got %+v", settings, consoleFormatter.ColorSettings)
+	}
+}
+
+func TestRenderOutputsPassesConsoleColorSettingsToRegistry(t *testing.T) {
+	lockAnalyzeOutput(t)
+
+	currentRegistry := outputRegistry
+	captured := output.ConsoleColorSettings{}
+	outputRegistry = func(ruleSet []rules.Rule, settings output.ConsoleColorSettings) (*output.Registry, error) {
+		captured = settings
+
+		return output.NewRegistry(
+			output.ConsoleFormatter{ColorSettings: settings},
+			output.JSONFormatter{},
+			output.SARIFFormatter{Rules: ruleSet},
+		)
+	}
+	t.Cleanup(func() {
+		outputRegistry = currentRegistry
+	})
+
+	expected := output.ConsoleColorSettings{Enabled: false, Source: output.ConsoleColorSourceEnv}
+	cfg := Config{Formats: []string{"json"}}
+	if err := renderOutputs([]string{"json"}, sampleRules(), cfg, expected, scan.Result{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured != expected {
+		t.Fatalf("expected settings %+v, got %+v", expected, captured)
+	}
+}
+
 func sampleRules() []rules.Rule {
 	return []rules.Rule{
 		{
@@ -582,4 +685,63 @@ func writeTempConfigFile(t *testing.T, contents string) string {
 	}
 
 	return path
+}
+
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func assertFailOnEmpty(t *testing.T, failOn string) {
+	t.Helper()
+
+	if failOn != "" {
+		t.Fatalf("expected empty fail-on, got %q", failOn)
+	}
+}
+
+func assertSingleConsoleFormat(t *testing.T, formats []string) {
+	t.Helper()
+
+	if len(formats) != 1 || formats[0] != "console" {
+		t.Fatalf("expected formats [console], got %v", formats)
+	}
+}
+
+func assertRuleSetSize(t *testing.T, ruleSet []rules.Rule, expected int) {
+	t.Helper()
+
+	if len(ruleSet) != expected {
+		t.Fatalf("expected %d rule, got %d", expected, len(ruleSet))
+	}
+}
+
+func assertConfigPathValue(t *testing.T, got, want string) {
+	t.Helper()
+
+	if got != want {
+		t.Fatalf("expected config path %q, got %q", want, got)
+	}
+}
+
+func assertDefaultConsoleColors(t *testing.T, settings output.ConsoleColorSettings) {
+	t.Helper()
+
+	if settings.Source != output.ConsoleColorSourceDefault {
+		t.Fatalf("expected default console color source, got %q", settings.Source)
+	}
+	if !settings.Enabled {
+		t.Fatal("expected default console colors enabled")
+	}
+}
+
+func assertFilesScannedNonNegative(t *testing.T, filesScanned int) {
+	t.Helper()
+
+	if filesScanned < 0 {
+		t.Fatalf("unexpected files scanned: %d", filesScanned)
+	}
 }

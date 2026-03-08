@@ -54,7 +54,7 @@ func TestHandleAnalyzeSurfaceRegistryErrors(t *testing.T) {
 	setAnalyzeCwd(t)
 
 	currentRegistry := outputRegistry
-	outputRegistry = func([]rules.Rule) (*output.Registry, error) {
+	outputRegistry = func([]rules.Rule, output.ConsoleColorSettings) (*output.Registry, error) {
 		return nil, errors.New("registry failed")
 	}
 	t.Cleanup(func() {
