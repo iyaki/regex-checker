@@ -24,6 +24,20 @@ func TestGoldenConsoleOutput(t *testing.T) {
 	assertGoldenBytes(t, "console.txt", buffer.Bytes())
 }
 
+func TestGoldenConsoleOutputWithColors(t *testing.T) {
+	t.Parallel()
+
+	result := goldenSampleResult()
+
+	var buffer bytes.Buffer
+	settings := ConsoleColorSettings{Enabled: true, Source: ConsoleColorSourceConfig}
+	if err := WriteConsoleWithSettings(result, settings, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertGoldenBytes(t, "console-color.txt", buffer.Bytes())
+}
+
 func TestGoldenJSONOutput(t *testing.T) {
 	t.Parallel()
 
