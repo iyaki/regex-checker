@@ -41,6 +41,10 @@ func normalizeConsoleColorSettings(settings ConsoleColorSettings) ConsoleColorSe
 
 // WriteConsole renders a scan result to the provided writer.
 func WriteConsole(result scan.Result, out io.Writer) error {
+	return writeConsole(result, ConsoleColorSettings{Enabled: false, Source: ConsoleColorSourceConfig}, out)
+}
+
+func writeConsole(result scan.Result, settings ConsoleColorSettings, out io.Writer) error {
 	matches := append([]scan.Match{}, result.Matches...)
 	sort.Slice(matches, func(i, j int) bool {
 		left := matches[i]
@@ -62,7 +66,7 @@ func WriteConsole(result scan.Result, out io.Writer) error {
 	})
 
 	var builder strings.Builder
-	if err := appendConsoleMatches(&builder, matches); err != nil {
+	if err := appendConsoleMatches(&builder, matches, settings.Enabled); err != nil {
 		return err
 	}
 
@@ -80,9 +84,9 @@ func WriteConsole(result scan.Result, out io.Writer) error {
 
 // WriteConsoleWithSettings renders a scan result with explicit color settings.
 func WriteConsoleWithSettings(result scan.Result, settings ConsoleColorSettings, out io.Writer) error {
-	_ = normalizeConsoleColorSettings(settings)
+	normalized := normalizeConsoleColorSettings(settings)
 
-	return WriteConsole(result, out)
+	return writeConsole(result, normalized, out)
 }
 
 // ConsoleFormatter renders console output.
@@ -100,7 +104,7 @@ func (f ConsoleFormatter) Write(result scan.Result, out io.Writer) error {
 	return WriteConsoleWithSettings(result, f.ColorSettings, out)
 }
 
-func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error {
+func appendConsoleMatches(builder *strings.Builder, matches []scan.Match, colorsEnabled bool) error {
 	if len(matches) == 0 {
 		builder.WriteString("No matches found.\n")
 
@@ -114,7 +118,7 @@ func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error 
 			builder.WriteString(match.FilePath)
 			builder.WriteString("\n")
 		}
-		line, err := formatConsoleMatchLine(match)
+		line, err := formatConsoleMatchLineWithColor(match, colorsEnabled)
 		if err != nil {
 			return err
 		}
@@ -126,19 +130,61 @@ func appendConsoleMatches(builder *strings.Builder, matches []scan.Match) error 
 }
 
 func formatConsoleMatchLine(match scan.Match) (string, error) {
+	return formatConsoleMatchLineWithColor(match, false)
+}
+
+func formatConsoleMatchLineWithColor(match scan.Match, colorsEnabled bool) (string, error) {
 	absPath, err := absolutePathWithLine(match.FilePath, match.Root, match.Line)
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf(
-		"- %-5s %d:%d %s\n  %s\n",
-		severityLabel(match.Severity),
+		"- %s %d:%d %s\n  %s\n",
+		formatSeveritySegment(match.Severity, colorsEnabled),
 		match.Line,
 		match.Column,
 		match.Message,
 		absPath,
 	), nil
+}
+
+func formatSeveritySegment(value string, colorsEnabled bool) string {
+	label := severityLabel(value)
+	if !colorsEnabled {
+		return fmt.Sprintf("%-*s", severityLabelWidth, label)
+	}
+
+	colorCode := severityColorCode(value)
+	if colorCode == "" {
+		return fmt.Sprintf("%-*s", severityLabelWidth, label)
+	}
+
+	padding := severityLabelWidth - len(label)
+	if padding < 0 {
+		padding = 0
+	}
+
+	return colorizedSeverityLabel(label, colorCode) + strings.Repeat(" ", padding)
+}
+
+func colorizedSeverityLabel(label, colorCode string) string {
+	return "\x1b[" + colorCode + "m" + label + "\x1b[0m"
+}
+
+func severityColorCode(value string) string {
+	switch value {
+	case "error":
+		return "31"
+	case "warning":
+		return "33"
+	case "notice":
+		return "36"
+	case "info":
+		return "34"
+	default:
+		return ""
+	}
 }
 
 func absolutePathWithLine(filePath string, root string, line int) (string, error) {
@@ -170,6 +216,8 @@ const (
 	severityRankInfo
 	severityRankUnknown
 )
+
+const severityLabelWidth = 5
 
 func severityRank(value string) int {
 	switch value {

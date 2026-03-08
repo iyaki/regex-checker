@@ -96,6 +96,199 @@ func TestWriteConsoleOrdersAndGroupsMatches(t *testing.T) {
 	assertConsoleOutput(t, buffer.String(), expectedGroupedOutput(t))
 }
 
+func TestWriteConsoleWithSettingsAppliesANSISeverityColors(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: []scan.Match{
+			{Message: "Error msg", Severity: "error", FilePath: "a/file.go", Line: 1, Column: 1},
+			{Message: "Warn msg", Severity: "warning", FilePath: "a/file.go", Line: 2, Column: 1},
+			{Message: "Notice msg", Severity: "notice", FilePath: "a/file.go", Line: 3, Column: 1},
+			{Message: "Info msg", Severity: "info", FilePath: "a/file.go", Line: 4, Column: 1},
+		},
+		Stats: scan.Stats{FilesScanned: 1, Matches: 4},
+	}
+
+	var buffer bytes.Buffer
+	settings := ConsoleColorSettings{Enabled: true, Source: ConsoleColorSourceConfig}
+	if err := WriteConsoleWithSettings(result, settings, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	consoleOutput := buffer.String()
+	expectedLines := []string{
+		"- \x1b[31mERROR\x1b[0m 1:1 Error msg",
+		"- \x1b[33mWARN\x1b[0m  2:1 Warn msg",
+		"- \x1b[36mNOTICE\x1b[0m 3:1 Notice msg",
+		"- \x1b[34mINFO\x1b[0m  4:1 Info msg",
+	}
+	for _, expected := range expectedLines {
+		if !strings.Contains(consoleOutput, expected) {
+			t.Fatalf("expected %q in console output, got:\n%s", expected, consoleOutput)
+		}
+	}
+}
+
+func TestWriteConsoleWithSettingsDisabledMatchesPlainOutput(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: []scan.Match{{Message: "Warn msg", Severity: "warning", FilePath: "a/file.go", Line: 2, Column: 3}},
+		Stats:   scan.Stats{FilesScanned: 1, Matches: 1},
+	}
+
+	var plainBuffer bytes.Buffer
+	if err := WriteConsole(result, &plainBuffer); err != nil {
+		t.Fatalf("unexpected plain output error: %v", err)
+	}
+
+	var disabledBuffer bytes.Buffer
+	settings := ConsoleColorSettings{Enabled: false, Source: ConsoleColorSourceConfig}
+	if err := WriteConsoleWithSettings(result, settings, &disabledBuffer); err != nil {
+		t.Fatalf("unexpected disabled output error: %v", err)
+	}
+
+	if disabledBuffer.String() != plainBuffer.String() {
+		t.Fatalf(
+			"expected disabled output to match plain output\nplain:\n%s\ndisabled:\n%s",
+			plainBuffer.String(),
+			disabledBuffer.String(),
+		)
+	}
+	if strings.Contains(disabledBuffer.String(), "\x1b[") {
+		t.Fatalf("expected no ANSI sequences when colors are disabled, got:\n%s", disabledBuffer.String())
+	}
+}
+
+func TestWriteConsoleWithSettingsUsesDefaultsWhenSourceMissing(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: []scan.Match{{Message: "Error msg", Severity: "error", FilePath: "a/file.go", Line: 1, Column: 1}},
+		Stats:   scan.Stats{FilesScanned: 1, Matches: 1},
+	}
+
+	var buffer bytes.Buffer
+	if err := WriteConsoleWithSettings(result, ConsoleColorSettings{}, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(buffer.String(), "\x1b[31mERROR\x1b[0m") {
+		t.Fatalf("expected default colorized severity, got:\n%s", buffer.String())
+	}
+}
+
+func TestWriteConsoleWithSettingsUnknownSeverityStaysPlain(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: []scan.Match{{Message: "Custom msg", Severity: "critical", FilePath: "a/file.go", Line: 1, Column: 1}},
+		Stats:   scan.Stats{FilesScanned: 1, Matches: 1},
+	}
+
+	var buffer bytes.Buffer
+	settings := ConsoleColorSettings{Enabled: true, Source: ConsoleColorSourceConfig}
+	if err := WriteConsoleWithSettings(result, settings, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	consoleOutput := buffer.String()
+	if !strings.Contains(consoleOutput, "- CRITICAL 1:1 Custom msg") {
+		t.Fatalf("expected plain unknown severity label, got:\n%s", consoleOutput)
+	}
+	if strings.Contains(consoleOutput, "\x1b[") {
+		t.Fatalf("expected unknown severity to have no ANSI color, got:\n%s", consoleOutput)
+	}
+}
+
+func TestWriteConsoleReturnsErrorForEmptyFilePath(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: []scan.Match{{Message: "Error msg", Severity: "error", FilePath: "", Line: 1, Column: 1}},
+		Stats:   scan.Stats{FilesScanned: 1, Matches: 1},
+	}
+
+	if err := WriteConsole(result, &bytes.Buffer{}); err == nil {
+		t.Fatal("expected error for empty file path")
+	}
+}
+
+func TestNormalizeConsoleColorSettings(t *testing.T) {
+	t.Parallel()
+
+	defaults := normalizeConsoleColorSettings(ConsoleColorSettings{})
+	if !defaults.Enabled {
+		t.Fatal("expected default console colors to be enabled")
+	}
+	if defaults.Source != ConsoleColorSourceDefault {
+		t.Fatalf("expected default source, got %q", defaults.Source)
+	}
+
+	settings := ConsoleColorSettings{Enabled: false, Source: ConsoleColorSourceEnv}
+	normalized := normalizeConsoleColorSettings(settings)
+	if normalized != settings {
+		t.Fatalf("expected unchanged settings %+v, got %+v", settings, normalized)
+	}
+}
+
+func TestFormatSeveritySegment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		severity      string
+		colorsEnabled bool
+		want          string
+	}{
+		{name: "plain error", severity: "error", colorsEnabled: false, want: "ERROR"},
+		{name: "colorized warn with padding", severity: "warning", colorsEnabled: true, want: "\x1b[33mWARN\x1b[0m "},
+		{name: "colorized notice without padding", severity: "notice", colorsEnabled: true, want: "\x1b[36mNOTICE\x1b[0m"},
+		{name: "unknown severity plain", severity: "custom", colorsEnabled: true, want: "CUSTOM"},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := formatSeveritySegment(testCase.severity, testCase.colorsEnabled)
+			if got != testCase.want {
+				t.Fatalf("unexpected formatted severity: got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestAbsolutePathWithLineRequiresFilePath(t *testing.T) {
+	t.Parallel()
+
+	if _, err := absolutePathWithLine("", "", 1); err == nil {
+		t.Fatal("expected error for empty file path")
+	}
+}
+
+func TestConsoleFormatterWriteUsesColorSettings(t *testing.T) {
+	t.Parallel()
+
+	formatter := ConsoleFormatter{ColorSettings: ConsoleColorSettings{Enabled: true, Source: ConsoleColorSourceConfig}}
+	if formatter.Name() != "console" {
+		t.Fatalf("unexpected formatter name: %s", formatter.Name())
+	}
+
+	result := scan.Result{
+		Matches: []scan.Match{{Message: "Error msg", Severity: "error", FilePath: "a/file.go", Line: 1, Column: 1}},
+		Stats:   scan.Stats{FilesScanned: 1, Matches: 1},
+	}
+
+	var buffer bytes.Buffer
+	if err := formatter.Write(result, &buffer); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if !strings.Contains(buffer.String(), "\x1b[31mERROR\x1b[0m") {
+		t.Fatalf("expected colorized formatter output, got:\n%s", buffer.String())
+	}
+}
+
 func TestFormatConsoleMatchLine(t *testing.T) {
 	t.Parallel()
 
@@ -198,6 +391,15 @@ func TestFormatConsoleMatchLineReturnsErrorWhenCwdMissing(t *testing.T) {
 	_, err = formatConsoleMatchLine(scan.Match{FilePath: "relative/file.go", Line: 1})
 	if err == nil {
 		t.Fatalf("expected error with missing cwd")
+	}
+
+	_, err = formatConsoleMatchLineWithColor(scan.Match{
+		FilePath: "relative/file.go",
+		Root:     "relative-root",
+		Line:     1,
+	}, false)
+	if err == nil {
+		t.Fatalf("expected error with missing cwd and non-empty root")
 	}
 }
 
