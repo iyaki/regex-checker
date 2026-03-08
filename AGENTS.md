@@ -13,7 +13,7 @@
 - Follow Test Driven Development practices: write failing tests before implementation.
 - Local suite: `bash scripts/quality.sh all`.
 - Targeted runs:
-  - `bash scripts/quality.sh lint|test|coverage|security|arch`.
+  - `bash scripts/quality.sh lint|test|coverage|mutation|security|arch`.
 - Coverage gate: default min 90% (`COVERAGE_MIN` override).
 - Run core tests with `go test ./...`.
 - Execute mutation testing with `bash scripts/quality.sh mutation` ONLY in final stages of the task development. **NEVER** execute mutation testing during the Test Driven Development process.
@@ -28,7 +28,7 @@
 ## Tooling Expectations
 
 - Go version: 1.25 (see `go.mod`).
-- Mutation testing tool: `go-mutesting`.
+- Mutation testing tool: `gremlins`.
 - Lint and security via `golangci-lint`, `govulncheck`, `go-arch-lint`, `go-fmt`.
 
 ## Implementation Guidance

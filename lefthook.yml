@@ -19,10 +19,8 @@ pre-commit:
       run: bash scripts/quality.sh coverage
       glob: "*.go"
     - name: mutation-testing
-      run: bash scripts/quality.sh mutation "\"{staged_files}\""
+      run: bash scripts/quality.sh mutation HEAD
       glob: "*.go"
-      exclude:
-        - "*_test.go"
     - name: golangci-lint
       run: bash scripts/quality.sh golangci
       glob: "*.go"

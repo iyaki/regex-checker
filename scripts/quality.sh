@@ -71,8 +71,12 @@ run_test_coverage() {
 	fi
 }
 
+run_test() {
+	run_test_coverage
+}
+
 run_mutation_testing() {
-	require_cmd go-mutesting
+	require_cmd gremlins
 	if ! has_go_files; then
 		echo "No Go files found; skipping mutation testing."
 		return 0
@@ -83,39 +87,21 @@ run_mutation_testing() {
 		return 0
 	fi
 
-	local output_file
-	output_file="$(mktemp -t quality-mutesting.XXXXXX)"
+	local score_min
+	score_min="${MUTATION_SCORE_MIN:-0.8}"
 
-	local targets
-	targets="${global_targets:-}"
-	if [ -z "$targets" ]; then
-		targets="${MUTATION_TARGETS:-./...}"
+	local efficacy_threshold
+	efficacy_threshold="$(awk -v score="$score_min" 'BEGIN {printf "%.2f", score * 100}')"
+
+	local mutant_coverage_threshold
+	mutant_coverage_threshold="${MUTATION_COVERAGE_MIN:-0}"
+
+	if [ -n "$global_targets" ]; then
+		gremlins unleash --threshold-efficacy "$efficacy_threshold" --threshold-mcover "$mutant_coverage_threshold" --diff "$global_targets"
+		return 0
 	fi
 
-	if ! go-mutesting $targets | tee "$output_file"; then
-		rm -f "$output_file" report.json go-mutesting-report.html
-		exit 1
-	fi
-
-	local score
-	score="$(awk '/^The mutation score is/{score=$5} END {print score}' "$output_file")"
-	rm -f "$output_file" report.json go-mutesting-report.html
-
-	if [ -z "$score" ]; then
-		echo "Unable to determine mutation score." >&2
-		exit 1
-	fi
-
-	local minimum
-	minimum="${MUTATION_SCORE_MIN:-0.8}"
-	if ! awk -v score="$score" -v minimum="$minimum" 'BEGIN {exit !(score >= minimum)}'; then
-		echo "Mutation score ${score} is below required ${minimum}." >&2
-		exit 1
-	fi
-}
-
-run_test() {
-	run_test_coverage
+	gremlins unleash --threshold-efficacy "$efficacy_threshold" --threshold-mcover "$mutant_coverage_threshold"
 }
 
 run_govulncheck() {

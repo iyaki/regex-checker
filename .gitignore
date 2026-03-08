@@ -3,6 +3,6 @@
 /node_modules
 /repomix-output.xml
 report.json
-go-mutesting-report.html
+gremlins-output.json
 *.tmp
 /oom
