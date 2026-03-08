@@ -4,6 +4,7 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -177,6 +178,53 @@ func TestHandleAnalyzeAcceptsShortFlags(t *testing.T) {
 	}
 }
 
+func TestHandleAnalyzeNoColorEnvOverridesConfigEnabledColors(t *testing.T) {
+	setAnalyzeCwd(t)
+	t.Setenv("NO_COLOR", "1")
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeConfig(t, configWithConsoleColorsEnabled(true))
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.Contains(output.String(), "\x1b[") {
+		t.Fatalf("expected NO_COLOR to disable ANSI output, got: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "- ERROR 1:1 Found token token=abc") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestHandleAnalyzeConfigEnabledColorsWithoutNoColorEnv(t *testing.T) {
+	setAnalyzeCwd(t)
+	t.Setenv("NO_COLOR", "")
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeConfig(t, configWithConsoleColorsEnabled(true))
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(output.String(), "\x1b[31mERROR\x1b[0m") {
+		t.Fatalf("expected ANSI-colored error label, got: %q", output.String())
+	}
+}
+
 func TestHandleAnalyzeReturnsErrorWhenFormatsInvalid(t *testing.T) {
 	t.Parallel()
 	setAnalyzeCwd(t)
@@ -227,6 +275,10 @@ func writeFile(t *testing.T, dir, name, contents string) {
 
 func sampleConfig() string {
 	return "rules:\n  - message: \"Found token $0\"\n    regex: \"token=[a-z]+\"\n    severity: \"error\"\n"
+}
+
+func configWithConsoleColorsEnabled(enabled bool) string {
+	return "consoleColorsEnabled: " + fmt.Sprintf("%t", enabled) + "\n" + sampleConfig()
 }
 
 func setAnalyzeCwd(t *testing.T) {
