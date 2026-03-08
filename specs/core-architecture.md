@@ -156,7 +156,7 @@ ScanResult
 
 ## Verifications
 
-- Code builds and `go test ./...` passes.
+- Code builds and `make test` passes.
 - CLI scan produces console, JSON, and SARIF outputs.
 
 ## Appendices

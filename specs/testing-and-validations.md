@@ -43,7 +43,7 @@
 Full suite:
 
 ```bash
-bash scripts/quality.sh all
+make quality
 ```
 
 Install git hooks:
@@ -55,17 +55,13 @@ lefthook install
 Targeted runs:
 
 ```bash
-bash scripts/quality.sh format
-bash scripts/quality.sh lint
-bash scripts/quality.sh test
-bash scripts/quality.sh coverage
-bash scripts/quality.sh mutation
-bash scripts/quality.sh security
-bash scripts/quality.sh arch
-bash scripts/quality.sh gofmt
-bash scripts/quality.sh golangci
-bash scripts/quality.sh govulncheck
-bash scripts/quality.sh go-arch-lint
+make lint
+make test
+make test-race
+make coverage
+make mutation
+make security
+make arch
 ```
 
 ### Configuration files
@@ -77,8 +73,8 @@ bash scripts/quality.sh go-arch-lint
 
 ### CI coverage
 
-- `/.github/workflows/quality.yml` runs lint, security, and architecture checks.
-- `/.github/workflows/quality.yml` runs mutation testing via `scripts/quality.sh mutation`.
+- `/.github/workflows/quality.yml` runs lint, and architecture checks.
+- `/.github/workflows/quality.yml` runs mutation testing via `make mutation`.
 
 ## Validation Rules
 
@@ -142,7 +138,7 @@ bash scripts/quality.sh go-arch-lint
 - Enforced via `gremlins` on local quality runs, pre-commit hooks, and CI.
 - Minimum mutation score default: `0.8` (override with `MUTATION_SCORE_MIN`).
 - Optional minimum mutant coverage default: `0` (override with `MUTATION_COVERAGE_MIN`).
-- Optional diff target can be passed as second argument to `scripts/quality.sh mutation`.
+- Optional diff target can be passed with `make mutation ARGS='--diff <target>'`.
 
 ### Coverage
 
@@ -157,13 +153,13 @@ bash scripts/quality.sh go-arch-lint
 
 ## Test Execution
 
-- `go test ./...` runs unit and integration tests.
-- Optional: `UPDATE_GOLDEN=1 go test ./...` to refresh golden files.
+- `make test` runs unit and integration tests.
+- Optional: `UPDATE_GOLDEN=1 make test` to refresh golden files.
 - Unit tests must enforce line coverage > 90% (exclude integration and testdata packages).
 - Mutation testing must meet the minimum mutation score.
 
 ## Verifications
 
-- `go test ./...` passes.
+- `make test` passes.
 - `reglint analyze --config testdata/rules/example.yaml ./testdata/fixtures` exits with `0` when below `failOn`.
 - `reglint analyze --config testdata/rules/fail.yaml ./testdata/fixtures` exits with `2` when above `failOn`.

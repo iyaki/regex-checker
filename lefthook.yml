@@ -12,24 +12,21 @@ pre-commit:
     - rebase
   setup:
     # Format files
-    - run: bash scripts/quality.sh gofmt
+    - run: make format
       stage_fixed: true
   jobs:
     - name: test-coverage
-      run: bash scripts/quality.sh coverage
+      run: make test-coverage
       glob: "*.go"
     - name: mutation-testing
-      run: bash scripts/quality.sh mutation HEAD
+      run: make mutation ARGS="--diff HEAD"
       glob: "*.go"
     - name: golangci-lint
-      run: bash scripts/quality.sh golangci
+      run: make lint
       glob: "*.go"
     - name: govulncheck
-      run: bash scripts/quality.sh govulncheck
-      glob: "*.go"
-    - name: gosec
-      run: bash scripts/quality.sh gosec
+      run: make security
       glob: "*.go"
     - name: go-arch-lint
-      run: bash scripts/quality.sh go-arch-lint
+      run: make arch
       glob: "*.go"

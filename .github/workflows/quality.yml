@@ -23,19 +23,6 @@ jobs:
         with:
           version: v2.10
 
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "~1.25.8"
-      - name: govulncheck
-        if: ${{ hashFiles('**/*.go') != '' }}
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
   arch:
     runs-on: ubuntu-latest
     steps:
@@ -43,11 +30,11 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "~1.25.8"
-      - name: go-arch-lint
+      - name: install go-arch-lint
+        run: go install github.com/fe3dback/go-arch-lint@latest
+      - name: arch
         if: ${{ hashFiles('**/*.go') != '' }}
-        run: |
-          go install github.com/fe3dback/go-arch-lint@latest
-          go-arch-lint check
+        run: make arch
 
   mutation:
     runs-on: ubuntu-latest
@@ -56,8 +43,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "~1.25.8"
-      - name: gremlins
+      - name: install gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@latest
+      - name: mutation
         if: ${{ hashFiles('**/*.go') != '' }}
-      - uses: go-gremlins/gremlins-action@v1
-        with:
-          version: latest
+        run: make mutation

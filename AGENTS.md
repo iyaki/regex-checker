@@ -11,19 +11,19 @@
 ## Testing and Quality Gates
 
 - Follow Test Driven Development practices: write failing tests before implementation.
-- Local suite: `bash scripts/quality.sh all`.
+- Local suite: `make quality`.
 - Targeted runs:
-  - `bash scripts/quality.sh lint|test|coverage|mutation|security|arch`.
-- Coverage gate: default min 90% (`COVERAGE_MIN` override).
-- Run core tests with `go test ./...`.
-- Execute mutation testing with `bash scripts/quality.sh mutation` ONLY in final stages of the task development. **NEVER** execute mutation testing during the Test Driven Development process.
+  - `make lint|test|test-race|coverage|coverage|mutation|security|arch`.
+- Coverage gate: min 90%.
+- Run core tests with `make test`.
+- Execute mutation testing with `make mutation` ONLY in final stages of the task development. **NEVER** execute mutation testing during the Test Driven Development process.
 
 ## Build and Run
 
-- Build the CLI binary: `go build -o bin/reglint ./cmd/reglint`.
-- Run from source (no build): `go run ./cmd/reglint <command> [flags]`.
-- Example with test data (config + fixture): `go run ./cmd/reglint analyze --config testdata/rules/example.yaml testdata/fixtures`.
-- Example with failing config (failOn): `go run ./cmd/reglint analyze --config testdata/rules/fail.yaml testdata/fixtures`.
+- Build the CLI binary: `make build`.
+- Run from source (no build): `make run ARGS='<command> [flags]'`.
+- Example with test data (config + fixture): `make analyze-example`.
+- Example with failing config (failOn): `make analyze-fail`.
 
 ## Tooling Expectations
 
