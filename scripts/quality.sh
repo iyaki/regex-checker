@@ -127,6 +127,15 @@ run_govulncheck() {
 	govulncheck ./...
 }
 
+run_gosec() {
+	require_cmd gosec
+	if ! has_go_files; then
+		echo "No Go files found; skipping gosec."
+		return 0
+	fi
+	gosec ./...
+}
+
 run_go_arch_lint() {
 	require_cmd go-arch-lint
 	if ! has_go_files; then
@@ -145,6 +154,9 @@ golangci | golangci-lint)
 	;;
 govulncheck)
 	run_govulncheck
+	;;
+gosec)
+	run_gosec
 	;;
 go-arch-lint | arch)
 	run_go_arch_lint
@@ -166,16 +178,18 @@ mutation)
 	;;
 security)
 	run_govulncheck
+	run_gosec
 	;;
 all)
 	run_go_fmt
 	run_golangci
 	run_test
 	run_govulncheck
+	run_gosec
 	run_go_arch_lint
 	;;
 *)
-	echo "Usage: $0 [all|format|lint|test|coverage|mutation|security|arch|gofmt|golangci|govulncheck|go-arch-lint]" >&2
+	echo "Usage: $0 [all|format|lint|test|coverage|mutation|security|arch|gofmt|golangci|govulncheck|gosec|go-arch-lint]" >&2
 	exit 1
 	;;
 esac

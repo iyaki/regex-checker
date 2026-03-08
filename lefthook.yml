@@ -29,6 +29,9 @@ pre-commit:
     - name: govulncheck
       run: bash scripts/quality.sh govulncheck
       glob: "*.go"
+    - name: gosec
+      run: bash scripts/quality.sh gosec
+      glob: "*.go"
     - name: go-arch-lint
       run: bash scripts/quality.sh go-arch-lint
       glob: "*.go"
