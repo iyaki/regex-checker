@@ -225,6 +225,31 @@ func TestHandleAnalyzeConfigEnabledColorsWithoutNoColorEnv(t *testing.T) {
 	}
 }
 
+func TestHandleAnalyzeConfigDisabledColorsWithoutNoColorEnv(t *testing.T) {
+	setAnalyzeCwd(t)
+	t.Setenv("NO_COLOR", "")
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeConfig(t, configWithConsoleColorsEnabled(false))
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.Contains(output.String(), "\x1b[") {
+		t.Fatalf("expected config to disable ANSI output, got: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "- ERROR 1:1 Found token token=abc") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
 func TestHandleAnalyzeReturnsErrorWhenFormatsInvalid(t *testing.T) {
 	t.Parallel()
 	setAnalyzeCwd(t)
