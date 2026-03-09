@@ -426,6 +426,115 @@ func TestRunAnalyzeUsesRuleSetBaselineFixture(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeCLIBaselineOverridesRuleSetBaseline(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfigWithPreamble(t, configDir, "baseline: \"ruleset-baseline.json\"\n")
+
+	ruleSetBaselinePath := filepath.Join(configDir, "ruleset-baseline.json")
+	if err := os.WriteFile(ruleSetBaselinePath, []byte(`{"schemaVersion":1,"entries":[]}`), 0o600); err != nil {
+		t.Fatalf("failed to write ruleset baseline fixture: %v", err)
+	}
+
+	cliBaselinePath := filepath.Join(t.TempDir(), "cli-baseline.json")
+	cliBaselinePayload := []byte(`{
+		"schemaVersion": 1,
+		"entries": [
+			{
+				"filePath": "sample.txt",
+				"message": "Found token token=abc",
+				"count": 1
+			}
+		]
+	}`)
+	if err := os.WriteFile(cliBaselinePath, cliBaselinePayload, 0o600); err != nil {
+		t.Fatalf("failed to write cli baseline fixture: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", cliBaselinePath,
+		"--fail-on", "warning",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(output.String(), "No matches found.") {
+		t.Fatalf("expected CLI baseline suppression to apply, got %q", output.String())
+	}
+	if strings.Contains(output.String(), "Found token token=abc") {
+		t.Fatalf("expected ruleset baseline to be overridden, got %q", output.String())
+	}
+}
+
+func TestRunAnalyzeRejectsInvalidBaselineJSONWithSingleErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	baselinePath := filepath.Join(t.TempDir(), "invalid.json")
+	if err := os.WriteFile(baselinePath, []byte("{"), 0o600); err != nil {
+		t.Fatalf("failed to write invalid baseline fixture: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", baselinePath,
+		rootDir,
+	}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(output.String(), "parse baseline") {
+		t.Fatalf("expected baseline parse error, got %q", output.String())
+	}
+	assertSingleErrorMessage(t, output.String())
+}
+
+func TestRunAnalyzeRejectsInvalidBaselineSchemaVersionWithSingleErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	baselinePath := filepath.Join(t.TempDir(), "invalid-schema.json")
+	baselinePayload := []byte(`{"schemaVersion":2,"entries":[]}`)
+	if err := os.WriteFile(baselinePath, baselinePayload, 0o600); err != nil {
+		t.Fatalf("failed to write invalid baseline fixture: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", baselinePath,
+		rootDir,
+	}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(output.String(), "baseline schemaVersion must be 1") {
+		t.Fatalf("expected baseline schema validation error, got %q", output.String())
+	}
+	assertSingleErrorMessage(t, output.String())
+}
+
 func TestRunAnalyzeRejectsInvalidBaselineFixture(t *testing.T) {
 	t.Parallel()
 
@@ -447,6 +556,7 @@ func TestRunAnalyzeRejectsInvalidBaselineFixture(t *testing.T) {
 	if !strings.Contains(output.String(), "duplicate baseline entry") {
 		t.Fatalf("expected baseline validation error, got %q", output.String())
 	}
+	assertSingleErrorMessage(t, output.String())
 }
 
 func TestRunUsesProvidedOutputWriter(t *testing.T) {
@@ -539,4 +649,16 @@ func writeRuleConfigWithPreamble(t *testing.T, dir, preamble string) string {
 	}
 
 	return path
+}
+
+func assertSingleErrorMessage(t *testing.T, got string) {
+	t.Helper()
+
+	trimmed := strings.TrimSuffix(got, "\n")
+	if trimmed == "" {
+		t.Fatalf("expected error output, got %q", got)
+	}
+	if strings.Contains(trimmed, "\n") {
+		t.Fatalf("expected a single-line error message, got %q", got)
+	}
 }
