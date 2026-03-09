@@ -1,7 +1,7 @@
 # Implementation Plan (ansi-colors)
 
-**Status:** ANSI color scope is largely implemented; quick-example alignment is complete and final quality work remains (4/6 phases complete, Phase 5 in progress)
-**Last Updated:** 2026-03-08
+**Status:** ANSI color scope is largely implemented; config-disabled CLI coverage is now explicit and final quality work remains (4/6 phases complete, Phase 5 in progress)
+**Last Updated:** 2026-03-09
 **Primary Specs:** `specs/formatter-console.md`, `specs/configuration.md`, `specs/cli-analyze.md` (related: `specs/formatter.md`, `specs/testing-and-validations.md`)
 
 ## Quick Reference
@@ -143,7 +143,7 @@
 
 - [ ] Add console tests for enabled ANSI emission and reset behavior.
 - [ ] Add console tests for config-disabled mode (no ANSI).
-- [x] Add CLI tests for `NO_COLOR` precedence over config.
+- [x] Add CLI tests for `NO_COLOR` precedence over config and config-disabled behavior with `NO_COLOR` unset.
 - [ ] Add config tests for `consoleColorsEnabled` parse/validation behavior.
 - [x] Baseline tests for output/cli/config suites already exist.
 
@@ -251,6 +251,10 @@
 - 2026-03-08: go test ./internal/cli -run 'TestHandleAnalyze(NoColorEnvOverridesConfigEnabledColors|ConfigEnabledColorsWithoutNoColorEnv)' - pass.
 - 2026-03-08: go test ./internal/cli - pass.
 - 2026-03-08: git commit -m "Add CLI NO_COLOR precedence coverage" - success (commit `7c15635`).
+- 2026-03-09: Read specs/README.md, specs/formatter-console.md, specs/cli-analyze.md, IMPLEMENTATION_PLAN.md - confirmed highest-priority single remaining task was explicit CLI coverage for config-disabled console colors.
+- 2026-03-09: go test ./internal/cli -run TestHandleAnalyzeConfigDisabledColorsWithoutNoColorEnv - pass.
+- 2026-03-09: go test ./internal/cli - pass.
+- 2026-03-09: git commit -m "Add analyze coverage for config-disabled colors" - success (commit `685a16e`).
 
 ## Summary
 
@@ -270,6 +274,7 @@
 - Console formatter provides deterministic ordering/grouping/summary plus ANSI severity rendering with fixed mapping and reset behavior in `internal/output/console.go`.
 - Formatter registry + routing is established in `internal/output/registry.go` and `internal/cli/analyze.go`.
 - Analyze runtime resolves console color precedence (`default -> config -> NO_COLOR`) and passes effective settings into the console formatter path.
+- CLI coverage now explicitly verifies `consoleColorsEnabled: false` disables ANSI when `NO_COLOR` is unset (`internal/cli/analyze_handle_test.go`).
 - `reglint init` default template now includes `consoleColorsEnabled: true` so generated quickstart configs match documented color defaults.
 - JSON and SARIF formatters already avoid ANSI concerns (`internal/output/json.go`, `internal/output/sarif.go`).
 - Baseline output/CLI/config tests and golden tests already exist and can be extended (`internal/output/golden_test.go`, `testdata/golden/*`).
