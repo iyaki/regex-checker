@@ -559,6 +559,106 @@ func TestRunAnalyzeRejectsInvalidBaselineFixture(t *testing.T) {
 	assertSingleErrorMessage(t, output.String())
 }
 
+func TestRunAnalyzeWriteBaselineRequiresEffectiveBaselinePath(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--write-baseline",
+		rootDir,
+	}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(output.String(), "--write-baseline requires an effective baseline path") {
+		t.Fatalf("expected missing baseline path error, got %q", output.String())
+	}
+	assertSingleErrorMessage(t, output.String())
+}
+
+func TestRunAnalyzeWriteBaselineIgnoresExistingBaselineContent(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(baselinePath, []byte("{"), 0o600); err != nil {
+		t.Fatalf("failed to write invalid baseline fixture: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--write-baseline",
+		"--format", "json",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	gotResult := decodeJSONResult(t, output.Bytes())
+	if len(gotResult.Matches) != 1 {
+		t.Fatalf("expected 1 match in write mode output, got %d", len(gotResult.Matches))
+	}
+
+	baselineDoc := readBaselineResult(t, baselinePath)
+	if baselineDoc.SchemaVersion != 1 {
+		t.Fatalf("expected schema version 1, got %d", baselineDoc.SchemaVersion)
+	}
+	if len(baselineDoc.Entries) != 1 {
+		t.Fatalf("expected 1 baseline entry, got %d", len(baselineDoc.Entries))
+	}
+	assertBaselineEntry(t, baselineDoc.Entries[0], "sample.txt", "Found token token=abc", 1)
+}
+
+func TestRunAnalyzeWriteBaselineExitsZeroWithFailOnMatches(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--write-baseline",
+		"--fail-on", "warning",
+		"--format", "json",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	gotResult := decodeJSONResult(t, output.Bytes())
+	if len(gotResult.Matches) != 1 {
+		t.Fatalf("expected full findings in write mode, got %d", len(gotResult.Matches))
+	}
+	if gotResult.Stats.Matches != 1 {
+		t.Fatalf("expected stats matches=1, got %d", gotResult.Stats.Matches)
+	}
+}
+
 func TestRunUsesProvidedOutputWriter(t *testing.T) {
 	t.Parallel()
 
@@ -611,6 +711,52 @@ type jsonResult struct {
 	SchemaVersion int          `json:"schemaVersion"`
 	Matches       []scan.Match `json:"matches"`
 	Stats         scan.Stats   `json:"stats"`
+}
+
+type baselineResult struct {
+	SchemaVersion int             `json:"schemaVersion"`
+	Entries       []baselineEntry `json:"entries"`
+}
+
+type baselineEntry struct {
+	FilePath string `json:"filePath"`
+	Message  string `json:"message"`
+	Count    int    `json:"count"`
+}
+
+func decodeJSONResult(t *testing.T, data []byte) jsonResult {
+	t.Helper()
+
+	var result jsonResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to parse json output: %v", err)
+	}
+
+	return result
+}
+
+func readBaselineResult(t *testing.T, path string) baselineResult {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read baseline output: %v", err)
+	}
+
+	var doc baselineResult
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("failed to parse generated baseline: %v", err)
+	}
+
+	return doc
+}
+
+func assertBaselineEntry(t *testing.T, got baselineEntry, filePath, message string, count int) {
+	t.Helper()
+
+	if got.FilePath != filePath || got.Message != message || got.Count != count {
+		t.Fatalf("unexpected baseline entry: %+v", got)
+	}
 }
 
 func writeFixture(t *testing.T, dir, name, content string) string {
