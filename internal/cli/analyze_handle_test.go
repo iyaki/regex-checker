@@ -3,6 +3,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/iyaki/reglint/internal/baseline"
 	"github.com/iyaki/reglint/internal/output"
 	"github.com/iyaki/reglint/internal/rules"
 )
@@ -100,6 +102,116 @@ func TestHandleAnalyzeFailOnThreshold(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Summary:") {
 		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestHandleAnalyzeBaselineSuppressionAffectsFailOn(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeConfig(t, sampleConfig())
+	baselinePath := writeBaseline(t, baseline.Document{
+		SchemaVersion: 1,
+		Entries: []baseline.Entry{
+			{FilePath: "sample.txt", Message: "Found token token=abc", Count: 1},
+		},
+	})
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--fail-on", "error",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(output.String(), "No matches found.") {
+		t.Fatalf("expected suppression output, got %q", output.String())
+	}
+}
+
+func TestHandleAnalyzeBaselineCompareReportsOnlyRegressions(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc\ntoken=abc\n")
+	configPath := writeConfig(t, sampleConfig())
+	baselinePath := writeBaseline(t, baseline.Document{
+		SchemaVersion: 1,
+		Entries: []baseline.Entry{
+			{FilePath: "sample.txt", Message: "Found token token=abc", Count: 1},
+		},
+	})
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--fail-on", "error",
+		rootDir,
+	}, &output)
+
+	if code != exitCodeFailOn {
+		t.Fatalf("expected exit code %d, got %d", exitCodeFailOn, code)
+	}
+	if got := strings.Count(output.String(), "Found token token=abc"); got != 1 {
+		t.Fatalf("expected one regression match, got %d in output %q", got, output.String())
+	}
+	if !strings.Contains(output.String(), "matches=1") {
+		t.Fatalf("expected summary to report one regression, got %q", output.String())
+	}
+}
+
+func TestHandleAnalyzeWriteBaselineIgnoresExistingContentAndReturnsZero(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc\ntoken=abc\n")
+	configPath := writeConfig(t, sampleConfig())
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(baselinePath, []byte("not-json"), defaultFileMode); err != nil {
+		t.Fatalf("failed to seed baseline file: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--write-baseline",
+		"--fail-on", "error",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.Contains(output.String(), "No matches found.") {
+		t.Fatalf("expected full findings in write mode, got %q", output.String())
+	}
+
+	document := readBaseline(t, baselinePath)
+	if document.SchemaVersion != 1 {
+		t.Fatalf("expected schema version 1, got %d", document.SchemaVersion)
+	}
+	if len(document.Entries) != 1 {
+		t.Fatalf("expected one baseline entry, got %d", len(document.Entries))
+	}
+	if document.Entries[0].FilePath != "sample.txt" {
+		t.Fatalf("expected baseline filePath sample.txt, got %q", document.Entries[0].FilePath)
+	}
+	if document.Entries[0].Message != "Found token token=abc" {
+		t.Fatalf("unexpected baseline message: %q", document.Entries[0].Message)
+	}
+	if document.Entries[0].Count != 2 {
+		t.Fatalf("expected baseline count 2, got %d", document.Entries[0].Count)
 	}
 }
 
@@ -296,6 +408,37 @@ func writeFile(t *testing.T, dir, name, contents string) {
 	if err := os.WriteFile(path, []byte(contents), defaultFileMode); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
+}
+
+func writeBaseline(t *testing.T, document baseline.Document) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	payload, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("failed to marshal baseline: %v", err)
+	}
+	if err := os.WriteFile(path, payload, defaultFileMode); err != nil {
+		t.Fatalf("failed to write baseline: %v", err)
+	}
+
+	return path
+}
+
+func readBaseline(t *testing.T, path string) baseline.Document {
+	t.Helper()
+
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read baseline: %v", err)
+	}
+
+	var document baseline.Document
+	if err := json.Unmarshal(payload, &document); err != nil {
+		t.Fatalf("failed to parse baseline: %v", err)
+	}
+
+	return document
 }
 
 func sampleConfig() string {

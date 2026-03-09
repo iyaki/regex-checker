@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -224,6 +225,162 @@ func TestRunAnalyzeReturnsConfigLoadError(t *testing.T) {
 	_ = consoleColors
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestRunAnalyzeResolvesRuleSetBaselinePathFromConfigDirectory(t *testing.T) {
+	t.Parallel()
+	lockAnalyzeOutput(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+
+	configDir := t.TempDir()
+	configPath := filepath.Join(configDir, "rules.yaml")
+	config := "baseline: baselines/current.json\n" + sampleConfig()
+	if err := os.WriteFile(configPath, []byte(config), defaultFileMode); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+	baselineDir := filepath.Join(configDir, "baselines")
+	if err := os.MkdirAll(baselineDir, 0o700); err != nil {
+		t.Fatalf("failed to create baseline directory: %v", err)
+	}
+	baselinePath := filepath.Join(baselineDir, "current.json")
+	if err := os.WriteFile(baselinePath, []byte(`{"schemaVersion":1,"entries":[]}`), defaultFileMode); err != nil {
+		t.Fatalf("failed to write baseline: %v", err)
+	}
+
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{"--config", configPath, rootDir})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleset
+	_ = consoleColors
+	assertNoError(t, err)
+
+	want := filepath.Join(configDir, "baselines", "current.json")
+	assertConfigStringFieldValue(t, cfg, "RuleSetBaselinePath", want)
+	assertConfigStringFieldValue(t, cfg, "EffectiveBaselinePath", want)
+	assertConfigStringFieldValue(t, cfg, "BaselinePath", "")
+}
+
+func TestRunAnalyzeResolvesCLIBaselinePathFromWorkingDirectory(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to read cwd: %v", err)
+	}
+	baselineArg := filepath.Join("relative", "baseline.json")
+	if err := os.MkdirAll(filepath.Join(cwd, "relative"), 0o700); err != nil {
+		t.Fatalf("failed to create baseline directory: %v", err)
+	}
+	baselinePayload := []byte(`{"schemaVersion":1,"entries":[]}`)
+	if err := os.WriteFile(
+		filepath.Join(cwd, baselineArg),
+		baselinePayload,
+		defaultFileMode,
+	); err != nil {
+		t.Fatalf("failed to write baseline: %v", err)
+	}
+
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--baseline", baselineArg,
+		rootDir,
+	})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleset
+	_ = consoleColors
+	assertNoError(t, err)
+
+	want := filepath.Join(cwd, baselineArg)
+	assertConfigStringFieldValue(t, cfg, "BaselinePath", want)
+	assertConfigStringFieldValue(t, cfg, "EffectiveBaselinePath", want)
+	assertConfigStringFieldValue(t, cfg, "RuleSetBaselinePath", "")
+}
+
+func TestRunAnalyzePrefersCLIBaselineOverRuleSetBaseline(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+
+	configDir := t.TempDir()
+	configPath := filepath.Join(configDir, "rules.yaml")
+	config := "baseline: config/baseline.json\n" + sampleConfig()
+	if err := os.WriteFile(configPath, []byte(config), defaultFileMode); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to read cwd: %v", err)
+	}
+	cliBaseline := filepath.Join("cli", "baseline.json")
+	if err := os.MkdirAll(filepath.Join(cwd, "cli"), 0o700); err != nil {
+		t.Fatalf("failed to create baseline directory: %v", err)
+	}
+	baselinePayload := []byte(`{"schemaVersion":1,"entries":[]}`)
+	if err := os.WriteFile(
+		filepath.Join(cwd, cliBaseline),
+		baselinePayload,
+		defaultFileMode,
+	); err != nil {
+		t.Fatalf("failed to write baseline: %v", err)
+	}
+
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--baseline", cliBaseline,
+		rootDir,
+	})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleset
+	_ = consoleColors
+	assertNoError(t, err)
+
+	wantCLI := filepath.Join(cwd, cliBaseline)
+	wantRuleSet := filepath.Join(configDir, "config", "baseline.json")
+	assertConfigStringFieldValue(t, cfg, "BaselinePath", wantCLI)
+	assertConfigStringFieldValue(t, cfg, "RuleSetBaselinePath", wantRuleSet)
+	assertConfigStringFieldValue(t, cfg, "EffectiveBaselinePath", wantCLI)
+}
+
+func TestRunAnalyzeWriteBaselineRequiresEffectiveBaselinePath(t *testing.T) {
+	t.Parallel()
+	lockAnalyzeOutput(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	result, failOn, formats, ruleset, cfg, consoleColors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--write-baseline",
+		rootDir,
+	})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleset
+	_ = cfg
+	_ = consoleColors
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--write-baseline requires an effective baseline path") {
+		t.Fatalf("expected write-baseline path error, got %v", err)
 	}
 }
 
@@ -743,5 +900,22 @@ func assertFilesScannedNonNegative(t *testing.T, filesScanned int) {
 
 	if filesScanned < 0 {
 		t.Fatalf("unexpected files scanned: %d", filesScanned)
+	}
+}
+
+func assertConfigStringFieldValue(t *testing.T, cfg Config, fieldName, want string) {
+	t.Helper()
+
+	value := reflect.ValueOf(cfg)
+	field := value.FieldByName(fieldName)
+	if !field.IsValid() {
+		t.Fatalf("expected config to include %s field", fieldName)
+	}
+	if field.Kind() != reflect.String {
+		t.Fatalf("expected config field %s to be string, got %s", fieldName, field.Kind())
+	}
+
+	if field.String() != want {
+		t.Fatalf("expected config field %s=%q, got %q", fieldName, want, field.String())
 	}
 }

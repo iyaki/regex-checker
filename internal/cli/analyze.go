@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/iyaki/reglint/internal/baseline"
 	"github.com/iyaki/reglint/internal/config"
 	"github.com/iyaki/reglint/internal/output"
 	"github.com/iyaki/reglint/internal/rules"
@@ -30,18 +31,22 @@ const (
 
 // Config holds parsed analyze command inputs.
 type Config struct {
-	ConfigPath       string
-	Roots            []string
-	Formats          []string
-	OutJSON          string
-	OutSARIF         string
-	Include          []string
-	Exclude          []string
-	Concurrency      int
-	ConcurrencySet   bool
-	MaxFileSizeBytes int64
-	FailOnSeverity   string
-	NoIgnoreFiles    bool
+	ConfigPath            string
+	Roots                 []string
+	Formats               []string
+	OutJSON               string
+	OutSARIF              string
+	Include               []string
+	Exclude               []string
+	Concurrency           int
+	ConcurrencySet        bool
+	MaxFileSizeBytes      int64
+	FailOnSeverity        string
+	BaselinePath          string
+	RuleSetBaselinePath   string
+	EffectiveBaselinePath string
+	WriteBaseline         bool
+	NoIgnoreFiles         bool
 }
 
 type stringSlice []string
@@ -98,6 +103,8 @@ func ParseAnalyzeArgs(args []string) (Config, error) {
 	flagSet.IntVar(&cfg.Concurrency, "concurrency", runtime.GOMAXPROCS(0), "Worker count.")
 	flagSet.Int64Var(&cfg.MaxFileSizeBytes, "max-file-size", defaultMaxFileBytes, "Maximum file size in bytes.")
 	flagSet.StringVar(&cfg.FailOnSeverity, "fail-on", "", "Fail if matches at or above severity.")
+	flagSet.StringVar(&cfg.BaselinePath, "baseline", "", "Baseline JSON path for suppression.")
+	flagSet.BoolVar(&cfg.WriteBaseline, "write-baseline", false, "Generate/regenerate baseline from findings.")
 	flagSet.BoolVar(&cfg.NoIgnoreFiles, "no-ignore-files", false, "Disable ignore file loading and matching.")
 
 	if err := flagSet.Parse(args); err != nil {
@@ -344,13 +351,72 @@ func runAnalyze(
 		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
 
+	cfg, err = prepareAnalyzeConfig(cfg, ruleSet)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
+	}
+
 	request, failOn, consoleColorSettings := BuildScanRequest(cfg, ruleSet)
 	result, err := scan.Run(request)
 	if err != nil {
 		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
 
+	result, failOn, err = applyBaselineMode(cfg, result, failOn)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
+	}
+
 	return result, failOn, cfg.Formats, request.Rules, cfg, consoleColorSettings, nil
+}
+
+func prepareAnalyzeConfig(cfg Config, ruleSet config.RuleSet) (Config, error) {
+	cliPath, ruleSetPath, effectivePath, err := resolveBaselinePaths(cfg, ruleSet)
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.BaselinePath = cliPath
+	cfg.RuleSetBaselinePath = ruleSetPath
+	cfg.EffectiveBaselinePath = effectivePath
+
+	if cfg.WriteBaseline && cfg.EffectiveBaselinePath == "" {
+		return Config{}, errors.New("--write-baseline requires an effective baseline path")
+	}
+
+	return cfg, nil
+}
+
+func applyBaselineMode(cfg Config, result scan.Result, failOn string) (scan.Result, string, error) {
+	if cfg.WriteBaseline {
+		generation := baseline.Generate(result.Matches)
+		if err := baseline.Write(cfg.EffectiveBaselinePath, generation.Document); err != nil {
+			return scan.Result{}, "", err
+		}
+
+		return result, "", nil
+	}
+
+	if cfg.EffectiveBaselinePath == "" {
+		return result, failOn, nil
+	}
+
+	document, err := baseline.Load(cfg.EffectiveBaselinePath)
+	if err != nil {
+		return scan.Result{}, "", err
+	}
+
+	comparison := baseline.Compare(result.Matches, document)
+	result = applyBaselineComparison(result, comparison)
+
+	return result, failOn, nil
+}
+
+func applyBaselineComparison(result scan.Result, comparison baseline.Comparison) scan.Result {
+	result.Matches = append([]scan.Match{}, comparison.Regressions...)
+	result.Stats.Matches = len(result.Matches)
+
+	return result
 }
 
 func renderOutputs(
@@ -596,4 +662,60 @@ func wasFlagProvided(flagSet *flag.FlagSet, name string) bool {
 	})
 
 	return found
+}
+
+func resolveBaselinePaths(cfg Config, ruleSet config.RuleSet) (string, string, string, error) {
+	ruleSetPath, err := resolveRuleSetBaselinePath(cfg.ConfigPath, ruleSet.Baseline)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	cliPath, err := resolveCLIBaselinePath(cfg.BaselinePath)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	effective := ruleSetPath
+	if cliPath != "" {
+		effective = cliPath
+	}
+
+	return cliPath, ruleSetPath, effective, nil
+}
+
+func resolveRuleSetBaselinePath(configPath string, baseline *string) (string, error) {
+	if baseline == nil {
+		return "", nil
+	}
+
+	trimmed := strings.TrimSpace(*baseline)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	if filepath.IsAbs(trimmed) {
+		return filepath.Clean(trimmed), nil
+	}
+
+	configDir := filepath.Dir(configPath)
+
+	return filepath.Clean(filepath.Join(configDir, trimmed)), nil
+}
+
+func resolveCLIBaselinePath(pathValue string) (string, error) {
+	trimmed := strings.TrimSpace(pathValue)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	if filepath.IsAbs(trimmed) {
+		return filepath.Clean(trimmed), nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("resolve baseline path: %w", err)
+	}
+
+	return filepath.Clean(filepath.Join(cwd, trimmed)), nil
 }
