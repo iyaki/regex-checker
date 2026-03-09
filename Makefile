@@ -14,6 +14,7 @@ help:
 	"  make format          Run gofmt on tracked Go files" \
 	"  make lint            Run golangci-lint" \
 	"  make test            Run tests with coverage gate" \
+	"  make test-race       Run tests with race detector" \
 	"  make coverage        Run coverage gate only" \
 	"  make mutation        Run mutation testing (final stage)" \
 	"  make security        Run govulncheck and gosec" \

@@ -85,7 +85,8 @@
 		},
 		// "ghcr.io/devcontainers-extra/features/uv:1": {},
 		"ghcr.io/devcontainers-extra/features/opencode:1": {},
-		"ghcr.io/iyaki/devcontainer-features/opencode-ralph:1": {}
+		"ghcr.io/iyaki/devcontainer-features/opencode-ralph:1": {},
+		"ghcr.io/iyaki/devcontainer-features/lefthook:1": {}
 	},
 
 	"customizations": {
@@ -103,7 +104,7 @@
 	"postCreateCommand": {
 		"Install npm packages": "npm install",
 		"Install go tools": "/bin/bash .devcontainer/install-go-tools.sh",
-		"Setup lefthook": "/go/bin/lefthook install"
+		"Setup lefthook": "lefthook install"
 	},
 	"postStartCommand": {
 		"Refresh opencode available models": "opencode models --refresh"
