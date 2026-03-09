@@ -150,6 +150,51 @@ func TestLoadRuleSetAllowsFailOnAndConcurrency(t *testing.T) {
 	}
 }
 
+func TestLoadRuleSetAllowsBaselinePath(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "baseline: 'testdata/baseline.json'\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	ruleSet, err := config.LoadRuleSet(path)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if ruleSet.Baseline == nil {
+		t.Fatal("expected baseline to be set")
+	}
+	if *ruleSet.Baseline != "testdata/baseline.json" {
+		t.Fatalf("expected baseline path to be propagated, got %q", *ruleSet.Baseline)
+	}
+}
+
+func TestLoadRuleSetRejectsEmptyBaseline(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "baseline: ''\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	_, err := config.LoadRuleSet(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "baseline") {
+		t.Fatalf("expected baseline validation error, got %v", err)
+	}
+}
+
+func TestLoadRuleSetRejectsNonStringBaseline(t *testing.T) {
+	t.Parallel()
+
+	path := writeConfigFile(t, "baseline: 42\nrules:\n  - message: 'hello'\n    regex: 'world'\n")
+
+	_, err := config.LoadRuleSet(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "baseline") {
+		t.Fatalf("expected baseline validation error, got %v", err)
+	}
+}
+
 func TestLoadRuleSetAllowsRuleSeverity(t *testing.T) {
 	t.Parallel()
 
@@ -459,6 +504,57 @@ func TestRuleSetToRulesPropagatesConsoleColorsEnabled(t *testing.T) {
 	}
 	if *converted.ConsoleColorsEnabled {
 		t.Fatal("expected propagated consoleColorsEnabled to be false")
+	}
+}
+
+func TestRuleSetToRulesPropagatesBaseline(t *testing.T) {
+	t.Parallel()
+
+	baseline := "testdata/baseline.json"
+	ruleSet := config.RuleSet{
+		Baseline: &baseline,
+		Rules:    []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+
+	converted := ruleSet.ToRules()
+	if converted.Baseline == nil {
+		t.Fatal("expected baseline to be propagated")
+	}
+	if *converted.Baseline != baseline {
+		t.Fatalf("expected propagated baseline %q, got %q", baseline, *converted.Baseline)
+	}
+}
+
+func TestRuleSetToRulesCopiesBaselineValue(t *testing.T) {
+	t.Parallel()
+
+	baseline := "testdata/baseline.json"
+	ruleSet := config.RuleSet{
+		Baseline: &baseline,
+		Rules:    []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+
+	converted := ruleSet.ToRules()
+	if converted.Baseline == nil {
+		t.Fatal("expected baseline to be propagated")
+	}
+
+	*converted.Baseline = "changed.json"
+	if *ruleSet.Baseline != "testdata/baseline.json" {
+		t.Fatalf("expected original baseline to remain unchanged, got %q", *ruleSet.Baseline)
+	}
+}
+
+func TestRuleSetToRulesLeavesBaselineUnsetWhenMissing(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+
+	converted := ruleSet.ToRules()
+	if converted.Baseline != nil {
+		t.Fatal("expected baseline to remain unset")
 	}
 }
 

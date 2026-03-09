@@ -19,6 +19,9 @@ func LoadRuleSet(path string) (RuleSet, error) {
 	if err := validateOptionalBooleanField(data, "consoleColorsEnabled"); err != nil {
 		return RuleSet{}, err
 	}
+	if err := validateOptionalStringField(data, "baseline"); err != nil {
+		return RuleSet{}, err
+	}
 
 	var ruleSet RuleSet
 	if err := yaml.Unmarshal(data, &ruleSet); err != nil {
@@ -50,6 +53,24 @@ func validateOptionalBooleanField(data []byte, fieldName string) error {
 	return nil
 }
 
+func validateOptionalStringField(data []byte, fieldName string) error {
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("parse config: %w", err)
+	}
+
+	value, exists := raw[fieldName]
+	if !exists {
+		return nil
+	}
+
+	if _, ok := value.(string); !ok {
+		return fmt.Errorf("%s must be a non-empty string", fieldName)
+	}
+
+	return nil
+}
+
 func validateRuleSet(ruleSet RuleSet) error {
 	if err := validateRuleSetFields(ruleSet); err != nil {
 		return err
@@ -67,6 +88,9 @@ func validateRuleSetFields(ruleSet RuleSet) error {
 	}
 	if ruleSet.Concurrency != nil && *ruleSet.Concurrency <= 0 {
 		return fmt.Errorf("concurrency must be positive")
+	}
+	if ruleSet.Baseline != nil && strings.TrimSpace(*ruleSet.Baseline) == "" {
+		return fmt.Errorf("baseline must be a non-empty string")
 	}
 	if err := validateIgnoreFiles(ruleSet); err != nil {
 		return err

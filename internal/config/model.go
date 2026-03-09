@@ -8,6 +8,7 @@ type RuleSet struct {
 	Exclude              StringList `yaml:"exclude,omitempty"`
 	FailOn               *string    `yaml:"failOn,omitempty"`
 	Concurrency          *int       `yaml:"concurrency,omitempty"`
+	Baseline             *string    `yaml:"baseline,omitempty"`
 	ConsoleColorsEnabled *bool      `yaml:"consoleColorsEnabled,omitempty"`
 	IgnoreFilesEnabled   *bool      `yaml:"ignoreFilesEnabled,omitempty"`
 	IgnoreFiles          StringList `yaml:"ignoreFiles,omitempty"`

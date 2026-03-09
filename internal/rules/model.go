@@ -12,6 +12,7 @@ type RuleSet struct {
 	Exclude              []string
 	FailOn               *string
 	Concurrency          *int
+	Baseline             *string
 	ConsoleColorsEnabled *bool
 	IgnoreFilesEnabled   *bool
 	IgnoreFiles          []string
