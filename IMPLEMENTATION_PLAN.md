@@ -1,6 +1,6 @@
 # Implementation Plan (baseline)
 
-**Status:** Baseline feature set is partially implemented in runtime code (Discovery complete, 5/8 phases complete; Phase 6 next)
+**Status:** Baseline feature set is partially implemented in runtime code (Discovery complete, 6/8 phases complete; Phase 7 in progress)
 **Last Updated:** 2026-03-09
 **Primary Specs:** `specs/cli-analyze-baseline.md`, `specs/cli-analyze.md`, `specs/configuration.md` (related: `specs/testing-and-validations.md`, `specs/cli-help.md`, `specs/cli.md`, `specs/core-architecture.md`, `specs/formatter.md`)
 
@@ -204,15 +204,15 @@
 ## Phase 7: End-to-end tests and regression coverage
 
 **Goal:** Add baseline-focused unit/integration coverage across config, CLI, and command entrypoints.
-**Status:** Not started
+**Status:** In progress
 **Paths:** `internal/baseline/*_test.go`, `internal/config/loader_test.go`, `internal/cli/*_test.go`, `cmd/reglint/main_test.go`, `testdata/*`
 **Reference pattern:** current command-level tests in `cmd/reglint/main_test.go` and fixture-driven tests in `internal/cli/analyze_handle_test.go`
 
 ### 7.1 Baseline behavior matrix
 
-- [ ] Equal-count suppression yields zero regressions.
-- [ ] Increased count yields only excess regressions.
-- [ ] Decreased count yields no regressions and non-failing behavior for that key.
+- [x] Equal-count suppression yields zero regressions.
+- [x] Increased count yields only excess regressions.
+- [x] Decreased count yields no regressions and non-failing behavior for that key.
 
 ### 7.2 Precedence and validation matrix
 
@@ -327,6 +327,11 @@
 - 2026-03-09: go test ./... - pass.
 - 2026-03-09: git commit -m "Add baseline fixtures and README usage examples" -- README.md cmd/reglint/main_test.go testdata/baseline/invalid-duplicate-keys.json testdata/baseline/valid-equal.json testdata/rules/baseline.yaml - success.
 - 2026-03-09: edit IMPLEMENTATION_PLAN.md - marked Phase 6 complete and updated remaining effort.
+- 2026-03-09: go test ./cmd/reglint -run "TestRunAnalyzeBaselineIncreaseReportsOnlyExcessRegressions|TestRunAnalyzeBaselineDecreaseDoesNotFailOnSuppressedKey" - pass.
+- 2026-03-09: go test ./cmd/reglint - pass.
+- 2026-03-09: git commit -m "Add baseline count-delta analyze integration tests" -- cmd/reglint/main_test.go - fail (pre-commit lint: lll in cmd/reglint/main_test.go).
+- 2026-03-09: git commit -m "Add baseline count-delta analyze integration tests" -- cmd/reglint/main_test.go - success.
+- 2026-03-09: Update IMPLEMENTATION_PLAN.md - marked Phase 7 as in progress and completed 7.1 baseline behavior matrix.
 
 ## Summary
 
@@ -338,10 +343,10 @@
 | Phase 4: Analyze CLI flags, precedence, and path resolution                 | Complete    |
 | Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Complete    |
 | Phase 6: Help text, docs, and fixture alignment                             | Complete    |
-| Phase 7: End-to-end tests and regression coverage                           | Not started |
+| Phase 7: End-to-end tests and regression coverage                           | In progress |
 | Phase 8: Final quality gates and release readiness                          | Not started |
 
-**Remaining effort:** Implement Phases 7-8.
+**Remaining effort:** Complete Phase 7.2-7.3 and Phase 8.
 
 ## Known Existing Work
 
@@ -357,6 +362,7 @@
 - `internal/baseline/writer.go` now provides deterministic baseline generation and canonical JSON overwrite behavior.
 - `README.md` now documents baseline compare/write usage and expected exit-code behavior with executable fixture examples.
 - `testdata/baseline/valid-equal.json`, `testdata/baseline/invalid-duplicate-keys.json`, and `testdata/rules/baseline.yaml` now provide deterministic fixtures for baseline compare, RuleSet baseline resolution, and validation-failure scenarios.
+- `cmd/reglint/main_test.go` now includes baseline increase/decrease integration coverage to verify regression-only excess reporting and non-failing decrease behavior.
 
 ## Manual Deployment Tasks
 
