@@ -129,6 +129,40 @@ func TestWriteConsoleWithSettingsAppliesANSISeverityColors(t *testing.T) {
 	}
 }
 
+func TestWriteConsoleWithSettingsResetsANSIColorPerSeverityLabel(t *testing.T) {
+	t.Parallel()
+
+	result := scan.Result{
+		Matches: []scan.Match{
+			{Message: "Error msg", Severity: "error", FilePath: "a/file.go", Line: 1, Column: 1},
+			{Message: "Warn msg", Severity: "warning", FilePath: "a/file.go", Line: 2, Column: 1},
+			{Message: "Notice msg", Severity: "notice", FilePath: "a/file.go", Line: 3, Column: 1},
+			{Message: "Info msg", Severity: "info", FilePath: "a/file.go", Line: 4, Column: 1},
+		},
+		Stats: scan.Stats{FilesScanned: 1, Matches: 4},
+	}
+
+	var buffer bytes.Buffer
+	settings := ConsoleColorSettings{Enabled: true, Source: ConsoleColorSourceConfig}
+	if err := WriteConsoleWithSettings(result, settings, &buffer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	consoleOutput := buffer.String()
+	if strings.Count(consoleOutput, "\x1b[") != 8 {
+		t.Fatalf("expected 8 ANSI sequences (4 open + 4 reset), got output:\n%s", consoleOutput)
+	}
+	if strings.Count(consoleOutput, "\x1b[0m") != 4 {
+		t.Fatalf("expected one reset per severity label, got output:\n%s", consoleOutput)
+	}
+
+	tail := strings.Split(consoleOutput, "\nSummary:")[0]
+	tail = strings.TrimSpace(tail)
+	if strings.Contains(tail, "\n  \x1b[") {
+		t.Fatalf("expected absolute path lines to remain uncolored, got:\n%s", consoleOutput)
+	}
+}
+
 func TestWriteConsoleWithSettingsDisabledMatchesPlainOutput(t *testing.T) {
 	t.Parallel()
 
