@@ -1,6 +1,6 @@
 # Implementation Plan (baseline)
 
-**Status:** Baseline feature set is implemented with release-readiness verification in progress (Discovery complete, 7/8 phases complete; Phase 8 in progress)
+**Status:** Baseline feature set is fully implemented and release-readiness verification is complete (Discovery complete, 8/8 phases complete)
 **Last Updated:** 2026-03-09
 **Primary Specs:** `specs/cli-analyze-baseline.md`, `specs/cli-analyze.md`, `specs/configuration.md` (related: `specs/testing-and-validations.md`, `specs/cli-help.md`, `specs/cli.md`, `specs/core-architecture.md`, `specs/formatter.md`)
 
@@ -239,23 +239,23 @@
 ## Phase 8: Final quality gates and release readiness
 
 **Goal:** Validate baseline implementation against repository quality gates and manual behavior checks.
-**Status:** In progress
+**Status:** Complete
 **Paths:** repository-wide (`internal/**`, `cmd/**`, `testdata/**`, `README.md`, `Makefile`)
 **Reference pattern:** `specs/testing-and-validations.md`
 
 ### 8.1 Automated gates
 
-- [ ] `go test ./...`
-- [ ] `make test`
-- [ ] `make lint`
-- [ ] `make quality`
-- [ ] `make mutation` (final stage only, per project guidance)
+- [x] `go test ./...`
+- [x] `make test`
+- [x] `make lint`
+- [x] `make quality`
+- [x] `make mutation` (final stage only, per project guidance)
 
 ### 8.2 Manual verification commands
 
-- [ ] `reglint analyze --config <rules> --baseline <file> <path>` (compare mode).
-- [ ] `reglint analyze --config <rules> --baseline <file> --write-baseline <path>` (write mode).
-- [ ] `reglint analyze --help` includes baseline flags.
+- [x] `reglint analyze --config <rules> --baseline <file> <path>` (compare mode).
+- [x] `reglint analyze --config <rules> --baseline <file> --write-baseline <path>` (write mode).
+- [x] `reglint analyze --help` includes baseline flags.
 - [x] JSON/SARIF outputs remain ANSI-free and schema-stable after baseline filtering.
 
 **Definition of Done**
@@ -352,21 +352,34 @@
 - 2026-03-09: go run ./cmd/reglint analyze --config testdata/rules/fail.yaml --baseline testdata/baseline/valid-equal.json --format json testdata/fixtures - pass (schemaVersion=1; matches empty).
 - 2026-03-09: git commit -m "Add baseline compare output contract integration tests" -- cmd/reglint/main_test.go - success.
 - 2026-03-09: Update IMPLEMENTATION_PLAN.md - marked Phase 8 in progress and completed JSON/SARIF ANSI-free schema-stability verification task.
+- 2026-03-09: go test ./internal/baseline -run TestLoadRejectsInvalidEntries - fail (Windows absolute baseline file paths were accepted).
+- 2026-03-09: go test ./internal/baseline -run TestLoadRejectsInvalidEntries - pass.
+- 2026-03-09: go test ./internal/baseline - pass.
+- 2026-03-09: go test ./internal/ignore - pass.
+- 2026-03-09: make test - pass.
+- 2026-03-09: make lint - pass.
+- 2026-03-09: make mutation - pass.
+- 2026-03-09: make quality - pass.
+- 2026-03-09: go run ./cmd/reglint analyze --config testdata/rules/fail.yaml --baseline testdata/baseline/valid-equal.json testdata/fixtures - pass.
+- 2026-03-09: go run ./cmd/reglint analyze --config testdata/rules/fail.yaml --baseline testdata/baseline/tmp-write-baseline.json --write-baseline testdata/fixtures - pass.
+- 2026-03-09: go run ./cmd/reglint analyze --config testdata/rules/fail.yaml --baseline testdata/baseline/tmp-write-baseline.json testdata/fixtures - pass.
+- 2026-03-09: go run ./cmd/reglint analyze --help - pass.
+- 2026-03-09: git commit -m "Fix baseline path validation for Windows paths" -- internal/baseline/loader.go internal/baseline/loader_test.go internal/ignore/matcher_test.go - success.
 
 ## Summary
 
-| Phase                                                                       | Status      |
-| --------------------------------------------------------------------------- | ----------- |
-| Phase 1: Scope verification and plan reset                                  | Complete    |
-| Phase 2: RuleSet schema and baseline path propagation                       | Complete    |
-| Phase 3: Baseline package implementation (`internal/baseline`)              | Complete    |
-| Phase 4: Analyze CLI flags, precedence, and path resolution                 | Complete    |
-| Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Complete    |
-| Phase 6: Help text, docs, and fixture alignment                             | Complete    |
-| Phase 7: End-to-end tests and regression coverage                           | Complete    |
-| Phase 8: Final quality gates and release readiness                          | In progress |
+| Phase                                                                       | Status   |
+| --------------------------------------------------------------------------- | -------- |
+| Phase 1: Scope verification and plan reset                                  | Complete |
+| Phase 2: RuleSet schema and baseline path propagation                       | Complete |
+| Phase 3: Baseline package implementation (`internal/baseline`)              | Complete |
+| Phase 4: Analyze CLI flags, precedence, and path resolution                 | Complete |
+| Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Complete |
+| Phase 6: Help text, docs, and fixture alignment                             | Complete |
+| Phase 7: End-to-end tests and regression coverage                           | Complete |
+| Phase 8: Final quality gates and release readiness                          | Complete |
 
-**Remaining effort:** Complete remaining Phase 8 automated/manual verification tasks and finalize release readiness.
+**Remaining effort:** None.
 
 ## Known Existing Work
 
@@ -380,6 +393,7 @@
 - `internal/baseline/model.go` and `internal/baseline/loader.go` now provide baseline document structures and strict load/validation behavior.
 - `internal/baseline/compare.go` now provides deterministic suppression-by-count comparison with regression-only outputs and improvement/suppression counts.
 - `internal/baseline/writer.go` now provides deterministic baseline generation and canonical JSON overwrite behavior.
+- `internal/baseline/loader.go` now rejects Windows absolute drive-path values (`<drive>:/...`) for `BaselineEntry.filePath`, preserving the relative-path validation contract across platforms.
 - `README.md` now documents baseline compare/write usage and expected exit-code behavior with executable fixture examples.
 - `testdata/baseline/valid-equal.json`, `testdata/baseline/invalid-duplicate-keys.json`, and `testdata/rules/baseline.yaml` now provide deterministic fixtures for baseline compare, RuleSet baseline resolution, and validation-failure scenarios.
 - `cmd/reglint/main_test.go` now includes baseline increase/decrease integration coverage to verify regression-only excess reporting and non-failing decrease behavior.
