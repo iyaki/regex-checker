@@ -86,6 +86,10 @@ make arch
 - `include` and `exclude` must be lists of strings when set.
 - `failOn` must be one of `error|warning|notice|info` when set.
 - `concurrency` must be a positive integer when set.
+- `git.mode` must be one of `off|staged|diff` when set.
+- `git.diff` is valid only when `git.mode=diff`.
+- `git.mode=diff` requires `git.diff`.
+- `git.addedLinesOnly=true` is valid only when `git.mode=staged|diff`.
 
 ### Rule (per entry)
 
@@ -103,6 +107,10 @@ make arch
 - `--baseline` must point to a readable JSON file when set.
 - RuleSet `baseline` must be a non-empty string path when set.
 - `--write-baseline` requires an effective baseline path from `--baseline` or RuleSet `baseline`.
+- `--git-mode` must be one of `off|staged|diff`.
+- `--git-diff` implies effective `--git-mode=diff`.
+- Effective `--git-mode=diff` requires `--git-diff`.
+- `--git-added-lines-only` is valid only with `--git-mode=staged|diff`.
 
 ### Baseline file
 
@@ -134,6 +142,9 @@ make arch
 - File read errors are recorded and scanning continues.
 - Matches at or above `failOn` return exit code `2`.
 - Output writer errors exit with code `1`.
+- In `git-mode=off`, missing Git executable must not fail the run.
+- In `git-mode=staged|diff`, missing Git executable, non-repo context, or invalid diff target exit with code `1`.
+- In Git-enabled runs, hook execution failures return a single error and exit with code `1`.
 
 ## Test Strategy
 
@@ -153,6 +164,12 @@ make arch
 - Baseline generation/regeneration behavior including overwrite and ignore-existing-baseline semantics.
 - Baseline generation exit behavior (`0` on successful write even when matches exist).
 - Output writers produce valid JSON and SARIF.
+- Git mode `staged` scans only staged files.
+- Git mode `diff` scans only files in the requested diff target.
+- `--git-added-lines-only` reports only matches on added lines.
+- `.gitignore` filtering can be enabled/disabled and behaves deterministically.
+- In Git-enabled scans, conflicting ignore decisions resolve with `.ignore/.reglintignore` priority over `.gitignore`.
+- With Git mode off, enabling hook infrastructure does not change scan outputs.
 
 ### Golden tests
 
@@ -165,6 +182,8 @@ make arch
 - Regex capture group interpolation (`$0`, `$1`, `$$`).
 - Mixed include/exclude rules and per-rule overrides.
 - Baseline key stability for `(filePath, message)` with deterministic suppression ordering.
+- Precedence stability across Git selection, include/exclude, ignore handling, per-rule filters, and added-lines filtering.
+- Regression case for `.ignore/.reglintignore` priority over `.gitignore` on conflicting paths.
 
 ### Mutation testing
 
@@ -197,3 +216,5 @@ make arch
 - `make test` passes.
 - `reglint analyze --config testdata/rules/example.yaml ./testdata/fixtures` exits with `0` when below `failOn`.
 - `reglint analyze --config testdata/rules/fail.yaml ./testdata/fixtures` exits with `2` when above `failOn`.
+- `reglint analyze --config testdata/rules/example.yaml --git-mode off ./testdata/fixtures` does not require Git.
+- `reglint analyze --config testdata/rules/example.yaml --git-mode staged` exits with `1` when Git is unavailable.

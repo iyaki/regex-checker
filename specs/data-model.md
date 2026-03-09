@@ -31,6 +31,17 @@ Status: Implemented
   - `exclude` (list of string, required): Effective exclude globs.
   - `maxFileSizeBytes` (int64, required): Skip files larger than this limit.
   - `concurrency` (int, required): Worker count for scanning.
+  - `git` (GitSelectionRequest, optional): Optional Git-backed scope constraints.
+
+### GitSelectionRequest
+
+- Definition: Optional Git-specific scope constraints attached to `ScanRequest`.
+- Fields:
+  - `mode` (string, required when set): `off|staged|diff`
+  - `diffTarget` (string, optional): Effective diff target for `mode=diff`.
+  - `candidateFiles` (list of string, optional): Root-relative candidate files from Git selection.
+  - `addedLinesByFile` (map string -> set of int, optional): 1-based added lines for each file.
+  - `gitignoreEnabled` (bool, required when set): Apply `.gitignore` filtering when true.
 
 ### Match
 
@@ -65,8 +76,10 @@ Status: Implemented
 - Scan service produces `ScanResult`.
 - Formatters consume `ScanResult`.
 - Severity values align with `specs/regex-rules.md`.
+- Git selection constraints narrow eligible files/lines before final match reporting.
 
 ## Notes
 
 - Location units are rune-based and 1-based; end columns are defined by the scan engine spec.
 - Formatters may require access to compiled rules from the scan pipeline; this entity model defines only match output.
+- `Match` and `ScanResult` schemas remain unchanged when Git integration is used.

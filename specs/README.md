@@ -37,4 +37,4 @@ Design docs and technical specifications
 
 ### Integrations
 
-- Git (TBD)
+- [Git Integration](specs/git-integration.md)

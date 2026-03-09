@@ -32,6 +32,16 @@ RuleSet
   - `concurrency` (int, optional): Worker count for scanning.
   - `baseline` (string, optional): Default baseline JSON path used by `analyze` when `--baseline` is not set.
   - `consoleColorsEnabled` (bool, optional): Enable ANSI colors in `console` formatter output.
+  - `git` (GitSettings, optional): Optional Git integration settings for scoped scans.
+
+GitSettings
+
+- Definition: Optional RuleSet-level controls for Git-backed scan scope.
+- Fields:
+  - `mode` (string, optional): `off|staged|diff`
+  - `diff` (string, optional): Diff target/range used by `mode: diff`.
+  - `addedLinesOnly` (bool, optional): Report only matches on added lines.
+  - `gitignoreEnabled` (bool, optional): Enable `.gitignore` filtering.
 
 ## YAML example (with globals)
 
@@ -45,6 +55,11 @@ failOn: "error"
 concurrency: 8
 baseline: "testdata/baseline.json"
 consoleColorsEnabled: true
+git:
+  mode: "diff"
+  diff: "HEAD~1..HEAD"
+  addedLinesOnly: false
+  gitignoreEnabled: true
 rules:
   - message: "This is an error message"
     regex: "regex1"
@@ -67,6 +82,10 @@ rules:
 - `concurrency`: `GOMAXPROCS` if missing.
 - `baseline`: unset (baseline disabled unless CLI flag sets it) if missing.
 - `consoleColorsEnabled`: `true` if missing.
+- `git.mode`: `off` if missing.
+- `git.diff`: unset if missing.
+- `git.addedLinesOnly`: `false` if missing.
+- `git.gitignoreEnabled`: `true` if missing.
 
 ## Validation
 
@@ -76,6 +95,12 @@ rules:
 - `concurrency` must be a positive integer when set.
 - `baseline` must be a non-empty string when set.
 - `consoleColorsEnabled` must be a boolean when set.
+- `git.mode` must be one of `off|staged|diff` when set.
+- `git.diff` must be a non-empty string when set.
+- `git.diff` is valid only when `git.mode=diff`.
+- `git.mode=diff` requires `git.diff`.
+- `git.addedLinesOnly=true` is valid only when `git.mode=staged|diff`.
+- `git.gitignoreEnabled` must be a boolean when set.
 - Rules are validated per `specs/regex-rules.md`.
 
 ## Notes
@@ -83,3 +108,4 @@ rules:
 - Rule schema, defaults, and path override behavior are defined in `specs/regex-rules.md`.
 - Runtime environment-variable precedence for console colors is defined in `specs/cli-analyze.md`.
 - Baseline generation/regeneration behavior using `--write-baseline` is defined in `specs/cli-analyze-baseline.md`.
+- Git runtime behavior and error semantics are defined in `specs/git-integration.md` and `specs/cli-analyze.md`.

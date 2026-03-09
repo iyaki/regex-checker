@@ -36,6 +36,13 @@ cmd/
 internal/
   config/
     loader.go
+  hooks/
+    scan_hooks.go
+  git/
+    adapter.go
+    diff.go
+    ignore.go
+    model.go
   baseline/
     model.go
     loader.go
@@ -64,6 +71,9 @@ internal/
 [Config Loader] -> [Rule Compiler]
   |                     |
   v                     v
+[Scan Hooks Registry] -> [Git Hook Provider] (optional)
+  | changed files / added lines
+  v
 [Scan Service] -> [Scan Engine] -> [File Walker]
   |
   v
@@ -80,11 +90,13 @@ internal/
 1. CLI parses flags and resolves scan roots.
 2. YAML config is loaded and validated.
 3. Rules compile to RE2 regexes with normalized severity.
-4. ScanService builds a request and starts the scan.
-5. Engine walks files, filters by globs, and matches rules.
-6. Optional baseline comparator filters matches to regressions.
-7. Optional baseline writer emits canonical baseline from full findings when regeneration mode is enabled.
-8. Results are rendered by output writers.
+4. Analyze assembles deterministic scan hooks for the run.
+5. Optional Git hooks resolve candidate files and added-line constraints when Git mode is enabled.
+6. ScanService builds a request and starts the scan.
+7. Engine walks files, applies filters (including hook augmentations), and matches rules.
+8. Optional baseline comparator filters matches to regressions.
+9. Optional baseline writer emits canonical baseline from full findings when regeneration mode is enabled.
+10. Results are rendered by output writers.
 
 ## Data model
 
@@ -93,7 +105,7 @@ internal/
 ScanRequest
 
 - Definition: Input to the scan service.
-- Fields: roots, rules, include/exclude, maxFileSizeBytes, concurrency, output formats.
+- Fields: roots, rules, include/exclude, maxFileSizeBytes, concurrency, optional git constraints, output formats.
 
 Match
 
@@ -131,6 +143,8 @@ ScanResult
 - Invalid YAML or regex: fail fast with exit code 1.
 - Output write failure: exit code 1.
 - File read error: record skipped and continue.
+- Git adapter/runtime failures: fatal only when Git mode is explicitly enabled.
+- Hook execution failures: fatal only when corresponding optional hook provider is active.
 
 ## APIs
 
@@ -154,6 +168,7 @@ ScanResult
 - RE2 regex prevents catastrophic backtracking.
 - Skip large or binary files to avoid resource abuse.
 - Treat match text as sensitive in logs.
+- Git-assisted scope selection must avoid exposing match content in Git-related errors.
 
 ## Dependencies
 
@@ -161,6 +176,7 @@ ScanResult
 - `github.com/bmatcuk/doublestar/v4`
 - `github.com/owenrumney/go-sarif/v2/sarif`
 - `golang.org/x/sync/errgroup`
+- Git CLI executable (runtime, only for Git-enabled analyze runs)
 
 ## Open Questions / Risks
 
@@ -175,3 +191,4 @@ ScanResult
 ## Appendices
 
 - See `specs/configuration.md` and `specs/regex-rules.md` for configuration details and `specs/data-model.md` for output schemas.
+- Git-specific hook behavior and contracts are defined in `specs/git-integration.md`.
