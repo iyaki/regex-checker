@@ -30,6 +30,7 @@ RuleSet
   - `exclude` (list of string, optional): Global exclude globs. Overridden by per-rule `exclude`.
   - `failOn` (string, optional): One of `error|warning|notice|info`. Causes non-zero exit status at or above this severity.
   - `concurrency` (int, optional): Worker count for scanning.
+  - `baseline` (string, optional): Default baseline JSON path used by `analyze` when `--baseline` is not set.
   - `consoleColorsEnabled` (bool, optional): Enable ANSI colors in `console` formatter output.
 
 ## YAML example (with globals)
@@ -42,6 +43,7 @@ exclude:
   - "**/generated/**"
 failOn: "error"
 concurrency: 8
+baseline: "testdata/baseline.json"
 consoleColorsEnabled: true
 rules:
   - message: "This is an error message"
@@ -63,6 +65,7 @@ rules:
 - RuleSet `exclude`: `**/.git/**`, `**/node_modules/**`, `**/vendor/**` if missing.
 - `failOn`: unset (no failure threshold) if missing.
 - `concurrency`: `GOMAXPROCS` if missing.
+- `baseline`: unset (baseline disabled unless CLI flag sets it) if missing.
 - `consoleColorsEnabled`: `true` if missing.
 
 ## Validation
@@ -71,6 +74,7 @@ rules:
 - `rules` is required.
 - `failOn` must be one of the allowed values when set.
 - `concurrency` must be a positive integer when set.
+- `baseline` must be a non-empty string when set.
 - `consoleColorsEnabled` must be a boolean when set.
 - Rules are validated per `specs/regex-rules.md`.
 
@@ -78,3 +82,4 @@ rules:
 
 - Rule schema, defaults, and path override behavior are defined in `specs/regex-rules.md`.
 - Runtime environment-variable precedence for console colors is defined in `specs/cli-analyze.md`.
+- Baseline generation/regeneration behavior using `--write-baseline` is defined in `specs/cli-analyze-baseline.md`.

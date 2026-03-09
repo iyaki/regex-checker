@@ -57,6 +57,10 @@ internal/
 4. Call formatter `Write` with `ScanResult` and writer.
 5. Propagate formatter errors to the CLI.
 
+Notes:
+
+- The `ScanResult` passed to formatters may be post-processed by CLI workflows (for example baseline suppression); formatter schemas and contracts remain unchanged.
+
 ## Data model
 
 ### Core Entities

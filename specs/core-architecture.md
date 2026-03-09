@@ -36,6 +36,11 @@ cmd/
 internal/
   config/
     loader.go
+  baseline/
+    model.go
+    loader.go
+    compare.go
+    writer.go
   rules/
     model.go
   scan/
@@ -62,6 +67,11 @@ internal/
 [Scan Service] -> [Scan Engine] -> [File Walker]
   |
   v
+[Baseline Loader + Comparator] (optional)
+  |
+  +--> [Baseline Writer] (optional, regeneration mode)
+  |
+  v
 [Output Writers] -> console | json | sarif
 ```
 
@@ -72,7 +82,9 @@ internal/
 3. Rules compile to RE2 regexes with normalized severity.
 4. ScanService builds a request and starts the scan.
 5. Engine walks files, filters by globs, and matches rules.
-6. Results are aggregated and rendered by output writers.
+6. Optional baseline comparator filters matches to regressions.
+7. Optional baseline writer emits canonical baseline from full findings when regeneration mode is enabled.
+8. Results are rendered by output writers.
 
 ## Data model
 
@@ -97,6 +109,7 @@ ScanResult
 
 - CLI builds ScanRequest.
 - ScanService produces ScanResult.
+- Baseline comparator optionally transforms ScanResult before rendering.
 - Output writers consume ScanResult.
 
 ### Persistence Notes

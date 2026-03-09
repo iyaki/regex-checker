@@ -99,6 +99,33 @@ make arch
 - `--config` (`-c`) must point to a readable file.
 - `--format` (`-f`) must be one of `console|json|sarif` (per formatter specs).
 - Output paths must be writable when `--out-*` flags are set.
+- `--baseline` must point to a readable JSON file when set.
+- RuleSet `baseline` must be a non-empty string path when set.
+- `--write-baseline` requires an effective baseline path from `--baseline` or RuleSet `baseline`.
+
+### Baseline file
+
+- JSON must parse successfully.
+- `schemaVersion` is required and must be `1`.
+- `entries` is required and must be a list.
+- Each entry requires non-empty `filePath` and `message`.
+- Each entry `count` must be a positive integer.
+- Duplicate `(filePath, message)` keys are rejected.
+
+### Baseline path precedence
+
+- Effective baseline path precedence is `--baseline` > RuleSet `baseline` > unset.
+- RuleSet `baseline` relative paths are resolved from the rules config directory.
+- `--baseline` relative paths are resolved from the current working directory.
+
+### Baseline generation
+
+- `--write-baseline` generates baseline entries from full current findings (no suppression).
+- Existing baseline file contents are ignored when `--write-baseline` is set.
+- Baseline output is canonical JSON (`schemaVersion=1`, sorted `entries`).
+- Baseline write errors fail with exit code `1`.
+- In `--write-baseline` mode, baseline JSON parsing/validation is skipped for existing baseline files.
+- In `--write-baseline` mode, successful baseline write returns exit code `0` regardless of matches or `--fail-on`.
 
 ### Runtime scan
 
@@ -120,6 +147,10 @@ make arch
 
 - CLI analyze happy path with fixture rules and sample files.
 - Exit code behavior for invalid config, invalid regex, and `failOn` threshold.
+- Exit code and output behavior with baseline suppression (equal/increase/decrease counts).
+- Config-defined baseline path behavior and CLI override precedence.
+- Baseline generation/regeneration behavior including overwrite and ignore-existing-baseline semantics.
+- Baseline generation exit behavior (`0` on successful write even when matches exist).
 - Output writers produce valid JSON and SARIF.
 
 ### Golden tests
@@ -132,6 +163,7 @@ make arch
 - Binary and large file skipping behavior.
 - Regex capture group interpolation (`$0`, `$1`, `$$`).
 - Mixed include/exclude rules and per-rule overrides.
+- Baseline key stability for `(filePath, message)` with deterministic suppression ordering.
 
 ### Mutation testing
 
