@@ -52,6 +52,19 @@ func TestLoadRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsUnreadableFile(t *testing.T) {
+	t.Parallel()
+
+	missingPath := filepath.Join(t.TempDir(), "missing-baseline.json")
+	_, err := Load(missingPath)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "read baseline") {
+		t.Fatalf("expected read baseline error, got %v", err)
+	}
+}
+
 func TestLoadRejectsSchemaViolations(t *testing.T) {
 	t.Parallel()
 
@@ -106,6 +119,12 @@ type invalidEntryCase struct {
 	wantErr string
 }
 
+type rawDocumentCase struct {
+	name    string
+	raw     baselineDocumentRaw
+	wantErr string
+}
+
 func TestLoadRejectsInvalidEntries(t *testing.T) {
 	t.Parallel()
 
@@ -120,6 +139,96 @@ func TestLoadRejectsInvalidEntries(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestValidateRawDocument(t *testing.T) {
+	t.Parallel()
+
+	entries := []Entry{{FilePath: "src/a.go", Message: "m1", Count: 1}}
+
+	for _, tt := range rawDocumentCases(entries) {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateRawDocument(tt.raw)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+
+				return
+			}
+
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func rawDocumentCases(entries []Entry) []rawDocumentCase {
+	return []rawDocumentCase{
+		{
+			name: "valid document",
+			raw: baselineDocumentRaw{
+				SchemaVersion: intPtr(1),
+				Entries:       &entries,
+			},
+		},
+		{
+			name: "missing schema version",
+			raw: baselineDocumentRaw{
+				Entries: &entries,
+			},
+			wantErr: "schemaVersion is required",
+		},
+		{
+			name: "wrong schema version",
+			raw: baselineDocumentRaw{
+				SchemaVersion: intPtr(2),
+				Entries:       &entries,
+			},
+			wantErr: "schemaVersion must be 1",
+		},
+		{
+			name: "missing entries",
+			raw: baselineDocumentRaw{
+				SchemaVersion: intPtr(1),
+			},
+			wantErr: "entries is required",
+		},
+	}
+}
+
+func TestIsWindowsAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "windows uppercase drive", value: "C:/src/a.go", want: true},
+		{name: "windows lowercase drive", value: "d:/src/a.go", want: true},
+		{name: "relative path", value: "src/a.go", want: false},
+		{name: "leading slash", value: "/src/a.go", want: false},
+		{name: "invalid drive letter", value: "1:/src/a.go", want: false},
+		{name: "too short", value: "C:", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := isWindowsAbsolutePath(tt.value)
+			if got != tt.want {
+				t.Fatalf("expected %v, got %v", tt.want, got)
 			}
 		})
 	}
@@ -161,6 +270,16 @@ func invalidPathEntryCases() []invalidEntryCase {
 				"schemaVersion": 1,
 				"entries": [
 					{"filePath": "../a.go", "message": "m1", "count": 1}
+				]
+			}`,
+			wantErr: "normalized relative path",
+		},
+		{
+			name: "windows absolute file path",
+			content: `{
+				"schemaVersion": 1,
+				"entries": [
+					{"filePath": "C:/src/a.go", "message": "m1", "count": 1}
 				]
 			}`,
 			wantErr: "normalized relative path",
@@ -229,4 +348,8 @@ func writeBaselineFile(t *testing.T, content string) string {
 	}
 
 	return path
+}
+
+func intPtr(value int) *int {
+	return &value
 }
