@@ -11,7 +11,7 @@
 | Baseline domain model, loader, comparator, writer                          | `specs/cli-analyze-baseline.md`, `specs/core-architecture.md`                                      | `internal/baseline/*`                                                                                          | `testdata/baseline/*.json`        | ✅ Implemented (model + loader + compare + writer complete) |
 | Analyze baseline flags and control flow (`--baseline`, `--write-baseline`) | `specs/cli-analyze.md`, `specs/cli.md`                                                             | `internal/cli/analyze.go`, `cmd/reglint/main.go`                                                               | CLI integration tests             | ✅ Implemented (flags + precedence + compare/write flow)    |
 | RuleSet baseline config field and propagation                              | `specs/configuration.md`, `specs/cli-analyze.md`                                                   | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` | `testdata/rules/*.yaml`           | ✅ Implemented (field + validation + propagation complete)  |
-| Help output coverage for baseline flags                                    | `specs/cli-help.md`, `specs/cli-analyze.md`                                                        | `internal/cli/help.go`, `internal/cli/cli_test.go`                                                             | Help snapshot assertions in tests | Missing (help text does not include baseline flags)         |
+| Help output coverage for baseline flags                                    | `specs/cli-help.md`, `specs/cli-analyze.md`                                                        | `internal/cli/help.go`, `internal/cli/cli_test.go`                                                             | Help snapshot assertions in tests | ✅ Implemented (baseline flags + alias help coverage)       |
 | Scan + formatter deterministic pipeline dependency                         | `specs/data-model.md`, `specs/formatter.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/scan/engine.go`, `internal/output/*.go`                                                              | `testdata/golden/*`               | ✅ Implemented (reusable baseline dependency)               |
 | Existing analyze routing, fail-on behavior, and output selection           | `specs/cli-analyze.md`                                                                             | `internal/cli/analyze.go`, `internal/cli/analyze_output_test.go`, `cmd/reglint/main_test.go`                   | Existing CLI tests                | ✅ Implemented (baseline extension point)                   |
 | Ignore-file precedence pattern (config -> CLI override)                    | `specs/ignore-files.md`                                                                            | `internal/cli/analyze.go`, `internal/scan/ignore_rules.go`, `internal/ignore/*`                                | Ignore behavior tests             | ✅ Implemented (reference pattern for precedence design)    |
@@ -175,15 +175,15 @@
 ## Phase 6: Help text, docs, and fixture alignment
 
 **Goal:** Align CLI help and user-facing docs with new baseline capabilities.
-**Status:** Not started
+**Status:** In progress
 **Paths:** `internal/cli/help.go`, `internal/cli/cli_test.go`, `README.md`, `testdata/rules/*.yaml`, `testdata/baseline/*.json`
 **Reference pattern:** existing deterministic help-output snapshots in `internal/cli/cli_test.go`
 
 ### 6.1 Analyze help output
 
-- [ ] Add `--baseline` and `--write-baseline` to analyze help topic output.
-- [ ] Update strict help snapshot tests.
-- [ ] Keep alias behavior (`analyse`) unchanged.
+- [x] Add `--baseline` and `--write-baseline` to analyze help topic output.
+- [x] Update strict help snapshot tests.
+- [x] Keep alias behavior (`analyse`) unchanged.
 
 ### 6.2 Docs and sample artifacts
 
@@ -314,6 +314,12 @@
 - 2026-03-09: make lint - pass.
 - 2026-03-09: git commit -m "Integrate baseline compare and write behavior into analyze" -- internal/cli/analyze.go internal/cli/analyze_handle_test.go internal/cli/analyze_output_test.go - success.
 - 2026-03-09: Update IMPLEMENTATION_PLAN.md - marked Phases 4 and 5 complete and refreshed remaining effort.
+- 2026-03-09: go test ./internal/cli -run "TestRunShowsHelpForAnalyzeFlag|TestRunShowsHelpForAnalyseFlag" - fail (analyze help output missing baseline flags before implementation).
+- 2026-03-09: go test ./internal/cli -run "TestRunShowsHelpForAnalyzeFlag|TestRunShowsHelpForAnalyseFlag" - pass.
+- 2026-03-09: go test ./internal/cli - pass.
+- 2026-03-09: go test ./cmd/reglint - pass.
+- 2026-03-09: git commit -m "Add baseline flags to analyze help output" -- internal/cli/help.go internal/cli/cli_test.go - success.
+- 2026-03-09: Update IMPLEMENTATION_PLAN.md - marked Phase 6.1 complete and Phase 6 as in progress.
 
 ## Summary
 
@@ -324,18 +330,18 @@
 | Phase 3: Baseline package implementation (`internal/baseline`)              | Complete    |
 | Phase 4: Analyze CLI flags, precedence, and path resolution                 | Complete    |
 | Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Complete    |
-| Phase 6: Help text, docs, and fixture alignment                             | Not started |
+| Phase 6: Help text, docs, and fixture alignment                             | In progress |
 | Phase 7: End-to-end tests and regression coverage                           | Not started |
 | Phase 8: Final quality gates and release readiness                          | Not started |
 
-**Remaining effort:** Implement Phases 6-8.
+**Remaining effort:** Complete Phase 6.2 and implement Phases 7-8.
 
 ## Known Existing Work
 
 - `internal/scan/engine.go` already provides deterministic match sorting and stable stats aggregation.
 - `internal/cli/analyze.go` now integrates baseline path resolution, compare-mode suppression, and write-mode generation while preserving formatter contracts.
 - `internal/output/console.go`, `internal/output/json.go`, and `internal/output/sarif.go` already provide deterministic formatter behavior and should remain schema-compatible.
-- `internal/cli/help.go` and `internal/cli/cli_test.go` already provide deterministic help rendering patterns that baseline flags can extend.
+- `internal/cli/help.go` and `internal/cli/cli_test.go` now include deterministic analyze help coverage for `--baseline`/`--write-baseline`, including the `analyse` alias help path.
 - `internal/config/loader.go` + `internal/config/loader_test.go` already provide strong schema validation scaffolding for additional RuleSet fields.
 - `internal/config/model.go`, `internal/config/rules.go`, and `internal/rules/model.go` now support RuleSet `baseline` propagation with copy-safe conversion.
 - `cmd/reglint/main_test.go` already contains command-level integration tests that can be extended for baseline behavior.
