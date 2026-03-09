@@ -204,7 +204,7 @@
 ## Phase 7: End-to-end tests and regression coverage
 
 **Goal:** Add baseline-focused unit/integration coverage across config, CLI, and command entrypoints.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `internal/baseline/*_test.go`, `internal/config/loader_test.go`, `internal/cli/*_test.go`, `cmd/reglint/main_test.go`, `testdata/*`
 **Reference pattern:** current command-level tests in `cmd/reglint/main_test.go` and fixture-driven tests in `internal/cli/analyze_handle_test.go`
 
@@ -222,9 +222,9 @@
 
 ### 7.3 Write-mode matrix
 
-- [ ] `--write-baseline` requires effective path.
-- [ ] Existing baseline content is ignored during write mode.
-- [ ] Successful write mode exits `0` even with failing matches.
+- [x] `--write-baseline` requires effective path.
+- [x] Existing baseline content is ignored during write mode.
+- [x] Successful write mode exits `0` even with failing matches.
 
 **Definition of Done**
 
@@ -337,6 +337,12 @@
 - 2026-03-09: go test ./... - pass.
 - 2026-03-09: make lint - pass.
 - 2026-03-09: git commit -m "Add baseline precedence and validation integration coverage" -- cmd/reglint/main_test.go - success.
+- 2026-03-09: go test ./cmd/reglint -run "TestRunAnalyzeWriteBaselineRequiresEffectiveBaselinePath|TestRunAnalyzeWriteBaselineIgnoresExistingBaselineContent|TestRunAnalyzeWriteBaselineExitsZeroWithFailOnMatches" - pass.
+- 2026-03-09: go test ./cmd/reglint - pass.
+- 2026-03-09: go test ./... - pass.
+- 2026-03-09: make lint - fail (cyclomatic complexity in new write-mode integration test).
+- 2026-03-09: make lint - pass.
+- 2026-03-09: git commit -m "Add write-mode baseline integration coverage" -- cmd/reglint/main_test.go - success.
 
 ## Summary
 
@@ -348,10 +354,10 @@
 | Phase 4: Analyze CLI flags, precedence, and path resolution                 | Complete    |
 | Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Complete    |
 | Phase 6: Help text, docs, and fixture alignment                             | Complete    |
-| Phase 7: End-to-end tests and regression coverage                           | In progress |
+| Phase 7: End-to-end tests and regression coverage                           | Complete    |
 | Phase 8: Final quality gates and release readiness                          | Not started |
 
-**Remaining effort:** Complete Phase 7.3 and Phase 8.
+**Remaining effort:** Complete Phase 8.
 
 ## Known Existing Work
 
@@ -369,6 +375,7 @@
 - `testdata/baseline/valid-equal.json`, `testdata/baseline/invalid-duplicate-keys.json`, and `testdata/rules/baseline.yaml` now provide deterministic fixtures for baseline compare, RuleSet baseline resolution, and validation-failure scenarios.
 - `cmd/reglint/main_test.go` now includes baseline increase/decrease integration coverage to verify regression-only excess reporting and non-failing decrease behavior.
 - `cmd/reglint/main_test.go` now includes baseline CLI-overrides-RuleSet precedence coverage and invalid baseline JSON/schema/duplicate validation coverage with single-line error assertions.
+- `cmd/reglint/main_test.go` now includes write-mode integration coverage for missing effective path validation, ignore-existing-baseline overwrite behavior, and guaranteed exit code `0` with `--fail-on` in write mode.
 
 ## Manual Deployment Tasks
 
