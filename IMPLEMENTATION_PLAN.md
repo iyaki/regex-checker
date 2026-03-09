@@ -1,19 +1,19 @@
 # Implementation Plan (ansi-colors)
 
-**Status:** ANSI color scope implementation is complete through test and docs alignment; final repository-wide verification is in progress (5/6 phases complete, Phase 6 in progress)
+**Status:** ANSI color scope implementation is complete through test/docs alignment and deterministic console regression verification; final repository-wide quality gates are still in progress (5/6 phases complete, Phase 6 in progress)
 **Last Updated:** 2026-03-09
 **Primary Specs:** `specs/formatter-console.md`, `specs/configuration.md`, `specs/cli-analyze.md` (related: `specs/formatter.md`, `specs/testing-and-validations.md`)
 
 ## Quick Reference
 
-| System / Subsystem                                       | Specs                                                 | Modules / Packages                                                                                             | Artifacts                                                     | Status                                                                               |
-| -------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Console formatter baseline (ordering, grouping, summary) | `specs/formatter-console.md`, `specs/formatter.md`    | `internal/output/console.go`, `internal/output/formatter.go`, `internal/output/registry.go`                    | `testdata/golden/console.txt`                                 | ✅ Implemented (plain output only)                                                   |
-| RuleSet color config schema                              | `specs/configuration.md`                              | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` | `internal/cli/init.go`, `testdata/rules/*.yaml`               | ✅ Implemented                                                                       |
-| Analyze color resolution and env precedence              | `specs/cli-analyze.md`, `specs/formatter-console.md`  | `internal/cli/analyze.go`, `internal/cli/help.go`                                                              | N/A                                                           | ✅ Implemented                                                                       |
-| ANSI severity rendering in console output                | `specs/formatter-console.md`                          | `internal/output/console.go`                                                                                   | `testdata/golden/console.txt` (or dedicated color fixtures)   | ✅ Implemented                                                                       |
-| Non-console formatter behavior (must stay ANSI-free)     | `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/output/json.go`, `internal/output/sarif.go`                                                          | `testdata/golden/output.json`, `testdata/golden/output.sarif` | ✅ Implemented                                                                       |
-| Verification and regression coverage                     | `specs/testing-and-validations.md`                    | `internal/output/*_test.go`, `internal/cli/*_test.go`, `internal/config/*_test.go`                             | `Makefile`, `testdata/golden/*`                               | Partial (non-console ANSI-free regression checks added; final quality gates pending) |
+| System / Subsystem                                       | Specs                                                 | Modules / Packages                                                                                             | Artifacts                                                     | Status                                                                                             |
+| -------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Console formatter baseline (ordering, grouping, summary) | `specs/formatter-console.md`, `specs/formatter.md`    | `internal/output/console.go`, `internal/output/formatter.go`, `internal/output/registry.go`                    | `testdata/golden/console.txt`                                 | ✅ Implemented (plain output only)                                                                 |
+| RuleSet color config schema                              | `specs/configuration.md`                              | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` | `internal/cli/init.go`, `testdata/rules/*.yaml`               | ✅ Implemented                                                                                     |
+| Analyze color resolution and env precedence              | `specs/cli-analyze.md`, `specs/formatter-console.md`  | `internal/cli/analyze.go`, `internal/cli/help.go`                                                              | N/A                                                           | ✅ Implemented                                                                                     |
+| ANSI severity rendering in console output                | `specs/formatter-console.md`                          | `internal/output/console.go`                                                                                   | `testdata/golden/console.txt` (or dedicated color fixtures)   | ✅ Implemented                                                                                     |
+| Non-console formatter behavior (must stay ANSI-free)     | `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/output/json.go`, `internal/output/sarif.go`                                                          | `testdata/golden/output.json`, `testdata/golden/output.sarif` | ✅ Implemented                                                                                     |
+| Verification and regression coverage                     | `specs/testing-and-validations.md`                    | `internal/output/*_test.go`, `internal/cli/*_test.go`, `internal/config/*_test.go`                             | `Makefile`, `testdata/golden/*`                               | Partial (console determinism + non-console ANSI-free checks complete; final quality gates pending) |
 
 ## Phase 1: Scope verification and delta lock
 
@@ -172,16 +172,16 @@
 
 ### 6.1 Verification commands
 
-- [ ] `go test ./...`
-- [ ] `make test`
-- [ ] `make lint`
+- [x] `go test ./...`
+- [x] `make test`
+- [x] `make lint`
 - [ ] `make quality`
 - [ ] Manual CLI checks for color enabled/disabled behavior.
 
 ### 6.2 Regression checks
 
 - [x] Confirm JSON and SARIF outputs remain ANSI-free.
-- [ ] Confirm console ordering/summary remains deterministic.
+- [x] Confirm console ordering/summary remains deterministic.
 - [x] Baseline package tests currently pass before ansi-colors changes.
 
 **Definition of Done**
@@ -274,6 +274,13 @@
 - 2026-03-09: go test ./internal/output -run TestWriteJSONDoesNotEmitANSIControlSequences|TestWriteSARIFDoesNotEmitANSIControlSequences - pass.
 - 2026-03-09: go test ./internal/output - pass.
 - 2026-03-09: git commit -m "Add ANSI-free regression checks for machine outputs" - success (commit `5cdb3e6`).
+- 2026-03-09: Read specs/README.md, specs/formatter-console.md, specs/formatter.md, specs/testing-and-validations.md, IMPLEMENTATION_PLAN.md - confirmed highest-priority single remaining task was deterministic console ordering/summary regression verification.
+- 2026-03-09: go test ./internal/output -run TestWriteConsoleDeterministicAcrossEquivalentSortKeys - pass.
+- 2026-03-09: go test ./internal/output - pass.
+- 2026-03-09: make test - pass.
+- 2026-03-09: make lint - pass.
+- 2026-03-09: python coverage script (go test -coverprofile + go tool cover -func) - pass (total coverage 92.7%).
+- 2026-03-09: git commit -m "Stabilize console ordering for equivalent matches" - success (commit `121c968`).
 
 ## Summary
 
@@ -286,7 +293,7 @@
 | Phase 5: Tests, fixtures, and docs alignment  | Complete    |
 | Phase 6: Final verification and quality gates | In progress |
 
-**Remaining effort:** Execute remaining Phase 6 repository-wide quality gates and deterministic console regression verification.
+**Remaining effort:** Execute remaining Phase 6 repository-wide quality gates (`make quality`) and manual CLI checks for color enabled/disabled behavior.
 
 ## Known Existing Work
 
@@ -299,6 +306,7 @@
 - Console output coverage now explicitly verifies config-disabled mode emits no ANSI sequences while preserving severity line formatting (`internal/output/console_test.go`).
 - `reglint init` default template now includes `consoleColorsEnabled: true` so generated quickstart configs match documented color defaults.
 - JSON and SARIF output coverage now explicitly verifies ANSI-free payloads (`internal/output/json_test.go`, `internal/output/sarif_test.go`, `internal/output/ansi_assertions_test.go`).
+- Console ordering determinism coverage now explicitly verifies byte-identical output across equivalent sort keys by using stable tie-breakers (`message` -> `root` -> `ruleIndex`) in `internal/output/console.go` with regression coverage in `internal/output/console_test.go`.
 - Baseline output/CLI/config tests and golden tests already exist and can be extended (`internal/output/golden_test.go`, `testdata/golden/*`).
 
 ## Manual Deployment Tasks
