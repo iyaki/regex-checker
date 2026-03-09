@@ -175,7 +175,7 @@
 ## Phase 6: Help text, docs, and fixture alignment
 
 **Goal:** Align CLI help and user-facing docs with new baseline capabilities.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `internal/cli/help.go`, `internal/cli/cli_test.go`, `README.md`, `testdata/rules/*.yaml`, `testdata/baseline/*.json`
 **Reference pattern:** existing deterministic help-output snapshots in `internal/cli/cli_test.go`
 
@@ -187,9 +187,9 @@
 
 ### 6.2 Docs and sample artifacts
 
-- [ ] Add baseline usage examples to README.
-- [ ] Add baseline JSON fixtures for valid and invalid cases.
-- [ ] Keep examples aligned with actual command behavior and exit codes.
+- [x] Add baseline usage examples to README.
+- [x] Add baseline JSON fixtures for valid and invalid cases.
+- [x] Keep examples aligned with actual command behavior and exit codes.
 
 **Definition of Done**
 
@@ -320,6 +320,13 @@
 - 2026-03-09: go test ./cmd/reglint - pass.
 - 2026-03-09: git commit -m "Add baseline flags to analyze help output" -- internal/cli/help.go internal/cli/cli_test.go - success.
 - 2026-03-09: Update IMPLEMENTATION_PLAN.md - marked Phase 6.1 complete and Phase 6 as in progress.
+- 2026-03-09: go test ./cmd/reglint -run "TestRunAnalyzeUsesBaselineFixtureForCompareMode|TestRunAnalyzeUsesRuleSetBaselineFixture|TestRunAnalyzeRejectsInvalidBaselineFixture" - fail (baseline fixtures not present yet).
+- 2026-03-09: go test ./cmd/reglint -run "TestRunAnalyzeUsesBaselineFixtureForCompareMode|TestRunAnalyzeUsesRuleSetBaselineFixture|TestRunAnalyzeRejectsInvalidBaselineFixture" - pass.
+- 2026-03-09: go test ./cmd/reglint - pass.
+- 2026-03-09: go test ./internal/cli -run "Baseline|TestRunAnalyzeResolvesRuleSetBaselinePathFromConfigDirectory|TestRunAnalyzePrefersCLIBaselineOverRuleSetBaseline" - pass.
+- 2026-03-09: go test ./... - pass.
+- 2026-03-09: git commit -m "Add baseline fixtures and README usage examples" -- README.md cmd/reglint/main_test.go testdata/baseline/invalid-duplicate-keys.json testdata/baseline/valid-equal.json testdata/rules/baseline.yaml - success.
+- 2026-03-09: edit IMPLEMENTATION_PLAN.md - marked Phase 6 complete and updated remaining effort.
 
 ## Summary
 
@@ -330,11 +337,11 @@
 | Phase 3: Baseline package implementation (`internal/baseline`)              | Complete    |
 | Phase 4: Analyze CLI flags, precedence, and path resolution                 | Complete    |
 | Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Complete    |
-| Phase 6: Help text, docs, and fixture alignment                             | In progress |
+| Phase 6: Help text, docs, and fixture alignment                             | Complete    |
 | Phase 7: End-to-end tests and regression coverage                           | Not started |
 | Phase 8: Final quality gates and release readiness                          | Not started |
 
-**Remaining effort:** Complete Phase 6.2 and implement Phases 7-8.
+**Remaining effort:** Implement Phases 7-8.
 
 ## Known Existing Work
 
@@ -348,6 +355,8 @@
 - `internal/baseline/model.go` and `internal/baseline/loader.go` now provide baseline document structures and strict load/validation behavior.
 - `internal/baseline/compare.go` now provides deterministic suppression-by-count comparison with regression-only outputs and improvement/suppression counts.
 - `internal/baseline/writer.go` now provides deterministic baseline generation and canonical JSON overwrite behavior.
+- `README.md` now documents baseline compare/write usage and expected exit-code behavior with executable fixture examples.
+- `testdata/baseline/valid-equal.json`, `testdata/baseline/invalid-duplicate-keys.json`, and `testdata/rules/baseline.yaml` now provide deterministic fixtures for baseline compare, RuleSet baseline resolution, and validation-failure scenarios.
 
 ## Manual Deployment Tasks
 
