@@ -191,6 +191,18 @@ func analyzeHelpRuntimeFlags() []HelpFlag {
 			Default:     "none",
 			Description: "Fail if matches at or above severity.",
 		},
+		{
+			Long:        "--baseline",
+			Type:        "string",
+			Default:     "none",
+			Description: "Baseline JSON path for suppression.",
+		},
+		{
+			Long:        "--write-baseline",
+			Type:        "bool",
+			Default:     "false",
+			Description: "Generate/regenerate baseline from findings.",
+		},
 	}
 }
 

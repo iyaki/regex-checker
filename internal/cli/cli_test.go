@@ -101,24 +101,23 @@ func TestRunShowsHelpForAnalyzeFlag(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 	got := output.String()
-	want := "Usage:\n" +
-		"  reglint analyze [flags] [path ...]\n" +
-		"  reglint analyse [flags] [path ...]\n" +
-		"\n" +
-		"Flags:\n" +
-		"  -h, --help bool (default false)  Print help and exit.\n" +
-		"  -c, --config string (default reglint-rules.yaml)  Path to YAML rules config file.\n" +
-		"  -f, --format string (default console)  Comma-separated list of formats.\n" +
-		"      --out-json string (default none)  Output path for JSON results.\n" +
-		"      --out-sarif string (default none)  Output path for SARIF results.\n" +
-		"      --include string (default none)  Repeatable include glob.\n" +
-		"      --exclude string (default none)  Repeatable exclude glob.\n" +
-		"      --concurrency int (default GOMAXPROCS)  Worker count.\n" +
-		"      --max-file-size int (default 5242880)  Maximum file size in bytes.\n" +
-		"      --fail-on string (default none)  Fail if matches at or above severity.\n" +
-		"      --no-ignore-files bool (default false)  Disable ignore file loading and matching.\n"
-	if got != want {
-		t.Fatalf("expected %q, got %q", want, got)
+	if got != expectedAnalyzeHelpOutput() {
+		t.Fatalf("expected %q, got %q", expectedAnalyzeHelpOutput(), got)
+	}
+}
+
+func TestRunShowsHelpForAnalyseFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := cli.Run([]string{"analyse", "-h"}, map[string]cli.Handler{}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	got := output.String()
+	if got != expectedAnalyzeHelpOutput() {
+		t.Fatalf("expected %q, got %q", expectedAnalyzeHelpOutput(), got)
 	}
 }
 
@@ -173,4 +172,25 @@ func assertAnalyzeRouting(t *testing.T, command string) {
 	} else if len(gotArgs) != 1 || gotArgs[0] != "./path" {
 		t.Fatalf("expected args [./path], got %v", gotArgs)
 	}
+}
+
+func expectedAnalyzeHelpOutput() string {
+	return "Usage:\n" +
+		"  reglint analyze [flags] [path ...]\n" +
+		"  reglint analyse [flags] [path ...]\n" +
+		"\n" +
+		"Flags:\n" +
+		"  -h, --help bool (default false)  Print help and exit.\n" +
+		"  -c, --config string (default reglint-rules.yaml)  Path to YAML rules config file.\n" +
+		"  -f, --format string (default console)  Comma-separated list of formats.\n" +
+		"      --out-json string (default none)  Output path for JSON results.\n" +
+		"      --out-sarif string (default none)  Output path for SARIF results.\n" +
+		"      --include string (default none)  Repeatable include glob.\n" +
+		"      --exclude string (default none)  Repeatable exclude glob.\n" +
+		"      --concurrency int (default GOMAXPROCS)  Worker count.\n" +
+		"      --max-file-size int (default 5242880)  Maximum file size in bytes.\n" +
+		"      --fail-on string (default none)  Fail if matches at or above severity.\n" +
+		"      --baseline string (default none)  Baseline JSON path for suppression.\n" +
+		"      --write-baseline bool (default false)  Generate/regenerate baseline from findings.\n" +
+		"      --no-ignore-files bool (default false)  Disable ignore file loading and matching.\n"
 }
