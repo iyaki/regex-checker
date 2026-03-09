@@ -25,6 +25,7 @@ Design docs and technical specifications
 - [RegLint CLI](specs/cli.md)
 - [CLI Help Flag](specs/cli-help.md)
 - [Analyze command](specs/cli-analyze.md)
+- [Analyze baseline support](specs/cli-analyze-baseline.md)
 - [Init command](specs/cli-init.md)
 
 ### Formatters

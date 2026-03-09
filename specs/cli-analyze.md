@@ -1,6 +1,6 @@
 # Analyze Command
 
-Status: Implemented
+Status: Partially Implemented
 
 ## Overview
 
@@ -17,6 +17,8 @@ Status: Implemented
 - Support console, JSON, and SARIF output selection.
 - Allow ANSI colors in console output to be disabled via config or environment variables.
 - Provide the `analyse` alias with identical behavior.
+- Support optional baseline suppression using file/message count comparison.
+- Support generating/regenerating baseline files from current findings.
 
 ### Non-Goals
 
@@ -28,6 +30,8 @@ Status: Implemented
 
 - Command syntax, flags, defaults, and validation rules.
 - Mapping flags to `ScanRequest` and output writers.
+- Baseline-aware filtering behavior before output rendering and fail-on evaluation.
+- Baseline generation/regeneration behavior for capturing all current findings.
 
 ## Architecture
 
@@ -40,6 +44,7 @@ cmd/
 internal/
   cli/
     analyze.go
+  baseline/
   config/
   rules/
   scan/
@@ -49,7 +54,7 @@ internal/
 ### Component diagram (ASCII)
 
 ```
-[Analyze Command] -> [Config Loader] -> [Scan Service] -> [Output Writers]
+[Analyze Command] -> [Config Loader] -> [Scan Service] -> [Baseline Comparator/Writer] -> [Output Writers]
 ```
 
 ### Data flow summary
@@ -59,8 +64,11 @@ internal/
 3. Resolve include/exclude lists and defaults.
 4. Resolve effective console color settings from config and environment variables.
 5. Build `ScanRequest`.
-6. Run scan and render requested outputs.
-7. Exit with a deterministic code.
+6. Run scan.
+7. If `--write-baseline` is set, generate baseline from full findings and overwrite target file.
+8. Else if baseline is active, filter matches using `specs/cli-analyze-baseline.md`.
+9. Render requested outputs.
+10. Exit with a deterministic code.
 
 ## Data model
 
@@ -80,6 +88,8 @@ CLIConfig
   - `concurrency` (int, required)
   - `maxFileSizeBytes` (int64, required)
   - `failOnSeverity` (string, optional)
+  - `baselinePath` (string, optional)
+  - `rulesetBaselinePath` (string, optional)
   - `consoleColorsEnabled` (bool, required)
 
 Reference struct (Go):
@@ -96,6 +106,8 @@ type CLIConfig struct {
     Concurrency      int
     MaxFileSizeBytes int64
     FailOnSeverity   string
+    BaselinePath     string
+    RuleSetBaselinePath string
     ConsoleColorsEnabled bool
 }
 ```
@@ -115,8 +127,12 @@ type CLIConfig struct {
 4. Resolve the config path (default `reglint-rules.yaml`).
 5. Validate flags and formats (see Validation).
 6. Load and compile rules from the config file.
-7. Apply CLI overrides and build `ScanRequest`.
-8. Run scan and render outputs.
+7. Resolve effective baseline path from `--baseline` and RuleSet `baseline`.
+8. Apply CLI overrides and build `ScanRequest`.
+9. Run scan.
+10. If `--write-baseline` is set, generate baseline from full scan findings and overwrite the target file.
+11. Else if baseline is active, filter matches using `specs/cli-analyze-baseline.md`.
+12. Render outputs.
 
 ### Validation and errors
 
@@ -125,9 +141,15 @@ type CLIConfig struct {
 - `--concurrency` must be a positive integer.
 - `--max-file-size` must be a positive integer.
 - `--fail-on` must be one of `error|warning|notice|info` when set.
+- `--baseline` must point to a readable baseline JSON file when set.
+- `--write-baseline` requires an effective baseline path from `--baseline` or RuleSet `baseline`.
+- When `--write-baseline` is set, existing baseline content is ignored and overwritten.
+- RuleSet `baseline` must be a valid path string when set in config.
+- If RuleSet `baseline` is set and `--baseline` is unset, use RuleSet baseline path.
 - If multiple formats are requested:
   - `json` requires `--out-json`.
   - `sarif` requires `--out-sarif`.
+- In comparison mode (no `--write-baseline`), baseline schema/content validation follows `specs/cli-analyze-baseline.md`.
 - Any validation failure prints a single error message and exits with code 1.
 
 ### Exit codes
@@ -135,6 +157,7 @@ type CLIConfig struct {
 - `0`: scan completed and no match at or above `--fail-on` (or `--fail-on` unset).
 - `2`: scan completed and has matches at or above `--fail-on`.
 - `1`: configuration or runtime error.
+- In `--write-baseline` mode, a successful baseline write always exits `0` (even with matches).
 
 ## Configuration
 
@@ -147,17 +170,19 @@ reglint analyse [flags] [path ...]
 
 ### Flags
 
-| Flag              | Type   | Required | Default              | Purpose                                       |
-| ----------------- | ------ | -------- | -------------------- | --------------------------------------------- |
-| `--config,-c`     | string | no       | `reglint-rules.yaml` | Path to YAML rules config file.               |
-| `--format,-f`     | string | no       | `console`            | Comma-separated list of `console,json,sarif`. |
-| `--out-json`      | string | no       | none                 | Output path for JSON results.                 |
-| `--out-sarif`     | string | no       | none                 | Output path for SARIF results.                |
-| `--include`       | string | no       | none                 | Repeatable include glob for all rules.        |
-| `--exclude`       | string | no       | none                 | Repeatable exclude glob for all rules.        |
-| `--concurrency`   | int    | no       | `GOMAXPROCS`         | Worker count.                                 |
-| `--max-file-size` | int    | no       | `5242880`            | Skip files larger than N bytes.               |
-| `--fail-on`       | string | no       | none                 | Fail if matches at or above severity.         |
+| Flag               | Type   | Required | Default              | Purpose                                       |
+| ------------------ | ------ | -------- | -------------------- | --------------------------------------------- |
+| `--config,-c`      | string | no       | `reglint-rules.yaml` | Path to YAML rules config file.               |
+| `--format,-f`      | string | no       | `console`            | Comma-separated list of `console,json,sarif`. |
+| `--out-json`       | string | no       | none                 | Output path for JSON results.                 |
+| `--out-sarif`      | string | no       | none                 | Output path for SARIF results.                |
+| `--include`        | string | no       | none                 | Repeatable include glob for all rules.        |
+| `--exclude`        | string | no       | none                 | Repeatable exclude glob for all rules.        |
+| `--concurrency`    | int    | no       | `GOMAXPROCS`         | Worker count.                                 |
+| `--max-file-size`  | int    | no       | `5242880`            | Skip files larger than N bytes.               |
+| `--fail-on`        | string | no       | none                 | Fail if matches at or above severity.         |
+| `--baseline`       | string | no       | none                 | Baseline JSON path for suppression.           |
+| `--write-baseline` | bool   | no       | `false`              | Generate/regenerate baseline from findings.   |
 
 ### Precedence
 
@@ -167,6 +192,13 @@ reglint analyse [flags] [path ...]
 - If `--exclude` is not provided, use RuleSet `exclude` or default to `**/.git/**`, `**/node_modules/**`, `**/vendor/**`.
 - If `--fail-on` is provided, it overrides RuleSet `failOn`.
 - If `--fail-on` is not provided, use RuleSet `failOn` when set; otherwise unset.
+- If `--baseline` is provided, it overrides RuleSet `baseline`.
+- If `--baseline` is not provided, use RuleSet `baseline` when set; otherwise baseline is disabled.
+- If `--baseline` is provided, baseline filtering is applied before formatter rendering.
+- If `--baseline` is provided, `--fail-on` is evaluated against regression matches only.
+- If `--write-baseline` is set, suppression is disabled and baseline is generated from full (unsuppressed) matches.
+- If `--write-baseline` is set, `--fail-on` does not affect the final exit code.
+- If `--write-baseline` is set and baseline file already exists, existing baseline is ignored and overwritten.
 - Console color behavior for `--format console`:
   - Start from RuleSet `consoleColorsEnabled` from `specs/configuration.md` (default `true`).
   - If `NO_COLOR` is set and non-empty, force colors disabled.
@@ -181,6 +213,8 @@ reglint analyse [flags] [path ...]
 - If `sarif` is the only format and `--out-sarif` is unset, write SARIF to stdout.
 - If multiple formats are requested, JSON and SARIF must have explicit output paths.
 - Environment-variable color controls apply only to `console`; `json` and `sarif` never emit ANSI escape sequences.
+- With `--baseline`, formatters receive regression-only matches; `stats.matches` reflects regression count.
+- With `--write-baseline`, formatters receive full matches and baseline file is written from full findings.
 
 ## Verifications
 
@@ -190,6 +224,14 @@ reglint analyse [flags] [path ...]
 - Invalid `--fail-on` value exits with code 1 and prints an error.
 - With `consoleColorsEnabled: false` in config, `-f console` output has no ANSI escape sequences.
 - With `NO_COLOR=1`, `-f console` output has no ANSI escape sequences even if config enables colors.
+- `reglint analyze -c reglint-rules.yaml --baseline testdata/baseline.json` reports only matches above baseline counts.
+- With `baseline` set in rules config and no `--baseline`, analyze uses the config baseline path.
+- With both config baseline and `--baseline`, analyze uses the CLI baseline path.
+- `reglint analyze -c reglint-rules.yaml --baseline testdata/baseline.json --write-baseline` regenerates baseline from all current findings.
+- With `--write-baseline`, existing baseline file contents are ignored.
+- With `--write-baseline`, successful baseline write exits with code 0 even when matches are present.
+- With `--write-baseline` and no effective baseline path, analyze exits with code 1.
+- Invalid baseline file exits with code 1 and prints one error message.
 
 ## Appendices
 
@@ -199,4 +241,5 @@ reglint analyse [flags] [path ...]
 reglint analyze --config configs/example.rules.yaml
 reglint analyse -c configs/example.rules.yaml -f json --out-json /tmp/scan.json
 reglint analyze -c configs/example.rules.yaml -f sarif --out-sarif /tmp/scan.sarif
+reglint analyze -c configs/example.rules.yaml --baseline testdata/baseline.json --write-baseline
 ```

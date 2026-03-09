@@ -14,6 +14,8 @@ Status: Implemented
 - Stable, well-documented flags and exit codes.
 - Clear validation errors and deterministic behavior.
 - Support console, JSON, and SARIF output selection.
+- Support optional baseline suppression for incremental adoption.
+- Support baseline generation/regeneration from current findings.
 
 ### Non-Goals
 
@@ -87,12 +89,15 @@ CLICommand
 
 - Unknown command prints a single error message and exits with code 1.
 - Subcommand-specific validation is defined in the subcommand specs.
+- Analyze baseline behavior is defined in `specs/cli-analyze-baseline.md`.
+- Analyze baseline regeneration behavior is defined in `specs/cli-analyze-baseline.md`.
 
 ### Exit codes
 
 - `0`: success.
 - `1`: configuration or runtime error.
 - `2`: analyze command found matches at or above `--fail-on`.
+- Exception: `analyze --write-baseline` returns `0` on successful baseline write.
 
 ## APIs
 

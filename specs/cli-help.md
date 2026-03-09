@@ -203,6 +203,8 @@ Formatting rules:
 
 - `reglint --help` exits `0` and prints the root usage and commands list.
 - `reglint analyze --help` exits `0` and lists analyze flags including `--config/-c` and `--format/-f`.
+- `reglint analyze --help` exits `0` and lists baseline-related `--baseline` flag.
+- `reglint analyze --help` exits `0` and lists baseline generation `--write-baseline` flag.
 - `reglint analyse -h` exits `0` and prints the analyze usage lines.
 - `reglint init --help` exits `0` and lists `--out` and `--force`.
 - `reglint bogus --help` exits `1` and prints `Unknown command: bogus` only.
@@ -243,4 +245,6 @@ Flags:
   --concurrency int (default GOMAXPROCS)  Worker count.
   --max-file-size int (default 5242880)  Maximum file size in bytes.
   --fail-on string (default none)  Fail if matches at or above severity.
+  --baseline string (default none)  Baseline JSON path for suppression.
+  --write-baseline bool (default false)  Generate/regenerate baseline from findings.
 ```
