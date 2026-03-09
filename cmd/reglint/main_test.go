@@ -659,6 +659,114 @@ func TestRunAnalyzeWriteBaselineExitsZeroWithFailOnMatches(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeBaselineCompareJSONOutputRemainsANSIFreeAndSchemaStable(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	baselinePayload := []byte(`{
+		"schemaVersion": 1,
+		"entries": [
+			{
+				"filePath": "sample.txt",
+				"message": "Found token token=abc",
+				"count": 1
+			}
+		]
+	}`)
+	if err := os.WriteFile(baselinePath, baselinePayload, 0o600); err != nil {
+		t.Fatalf("failed to write baseline fixture: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--format", "json",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.Contains(output.String(), "\x1b[") {
+		t.Fatalf("expected ANSI-free JSON output, got %q", output.String())
+	}
+
+	got := decodeJSONResult(t, output.Bytes())
+	if got.SchemaVersion != 1 {
+		t.Fatalf("expected schemaVersion 1, got %d", got.SchemaVersion)
+	}
+	if len(got.Matches) != 0 {
+		t.Fatalf("expected baseline-filtered JSON matches to be empty, got %d", len(got.Matches))
+	}
+	if got.Stats.Matches != 0 {
+		t.Fatalf("expected baseline-filtered JSON stats.matches to be 0, got %d", got.Stats.Matches)
+	}
+}
+
+func TestRunAnalyzeBaselineCompareSARIFOutputRemainsANSIFreeAndSchemaStable(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	baselinePayload := []byte(`{
+		"schemaVersion": 1,
+		"entries": [
+			{
+				"filePath": "sample.txt",
+				"message": "Found token token=abc",
+				"count": 1
+			}
+		]
+	}`)
+	if err := os.WriteFile(baselinePath, baselinePayload, 0o600); err != nil {
+		t.Fatalf("failed to write baseline fixture: %v", err)
+	}
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--baseline", baselinePath,
+		"--format", "sarif",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.Contains(output.String(), "\x1b[") {
+		t.Fatalf("expected ANSI-free SARIF output, got %q", output.String())
+	}
+
+	got := decodeSARIFLog(t, output.Bytes())
+	if got.Schema != "https://json.schemastore.org/sarif-2.1.0.json" {
+		t.Fatalf("unexpected SARIF schema: %q", got.Schema)
+	}
+	if got.Version != "2.1.0" {
+		t.Fatalf("unexpected SARIF version: %q", got.Version)
+	}
+	if len(got.Runs) != 1 {
+		t.Fatalf("expected one SARIF run, got %d", len(got.Runs))
+	}
+	if got.Runs[0].ColumnKind != "unicodeCodePoints" {
+		t.Fatalf("unexpected columnKind: %q", got.Runs[0].ColumnKind)
+	}
+	if len(got.Runs[0].Results) != 0 {
+		t.Fatalf("expected baseline-filtered SARIF results to be empty, got %d", len(got.Runs[0].Results))
+	}
+}
+
 func TestRunUsesProvidedOutputWriter(t *testing.T) {
 	t.Parallel()
 
@@ -713,6 +821,22 @@ type jsonResult struct {
 	Stats         scan.Stats   `json:"stats"`
 }
 
+type sarifLog struct {
+	Schema  string     `json:"$schema"`
+	Version string     `json:"version"`
+	Runs    []sarifRun `json:"runs"`
+}
+
+type sarifRun struct {
+	ColumnKind string        `json:"columnKind"`
+	Results    []sarifResult `json:"results"`
+}
+
+type sarifResult struct {
+	RuleID string `json:"ruleId"`
+	Level  string `json:"level"`
+}
+
 type baselineResult struct {
 	SchemaVersion int             `json:"schemaVersion"`
 	Entries       []baselineEntry `json:"entries"`
@@ -733,6 +857,17 @@ func decodeJSONResult(t *testing.T, data []byte) jsonResult {
 	}
 
 	return result
+}
+
+func decodeSARIFLog(t *testing.T, data []byte) sarifLog {
+	t.Helper()
+
+	var log sarifLog
+	if err := json.Unmarshal(data, &log); err != nil {
+		t.Fatalf("failed to parse sarif output: %v", err)
+	}
+
+	return log
 }
 
 func readBaselineResult(t *testing.T, path string) baselineResult {
