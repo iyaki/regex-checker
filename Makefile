@@ -23,7 +23,7 @@ help:
 	"  make analyze-example Analyze test fixtures with example config" \
 	"  make analyze-fail    Analyze test fixtures with failOn config"
 
-quality: test test-race test-coverage test-mutation security arch
+quality: test lint test-race test-coverage test-mutation security arch
 
 format:
 	gofmt -w $$(git ls-files '*.go')

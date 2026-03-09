@@ -65,7 +65,7 @@ func validateOptionalStringField(data []byte, fieldName string) error {
 	}
 
 	if _, ok := value.(string); !ok {
-		return fmt.Errorf("%s must be a non-empty string", fieldName)
+		return fmt.Errorf("%s must be a string", fieldName)
 	}
 
 	return nil

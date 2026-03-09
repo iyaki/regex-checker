@@ -23,6 +23,11 @@ type baselineDocumentRaw struct {
 	Entries       *[]Entry `json:"entries"`
 }
 
+type entryIdentity struct {
+	filePath string
+	message  string
+}
+
 // Load reads and validates a baseline JSON file.
 func Load(path string) (Document, error) {
 	data, err := os.ReadFile(path) //#nosec G304 -- caller controls path and validation happens on parsed content
@@ -67,7 +72,7 @@ func validateRawDocument(raw baselineDocumentRaw) error {
 }
 
 func validateEntries(entries []Entry) error {
-	seen := make(map[string]struct{}, len(entries))
+	seen := make(map[entryIdentity]struct{}, len(entries))
 	for _, entry := range entries {
 		normalizedPath, err := validateEntryFilePath(entry.FilePath)
 		if err != nil {
@@ -80,7 +85,7 @@ func validateEntries(entries []Entry) error {
 			return fmt.Errorf("baseline entry count must be positive")
 		}
 
-		key := normalizedPath + "\x00" + entry.Message
+		key := entryIdentity{filePath: normalizedPath, message: entry.Message}
 		if _, exists := seen[key]; exists {
 			return fmt.Errorf("duplicate baseline entry for filePath=%q message=%q", normalizedPath, entry.Message)
 		}

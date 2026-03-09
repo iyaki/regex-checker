@@ -3,7 +3,6 @@ package cli_test
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -191,8 +190,12 @@ func TestParseAnalyzeBaselineFlags(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	assertConfigStringField(t, got, "BaselinePath", "testdata/baseline.json")
-	assertConfigBoolField(t, got, "WriteBaseline", true)
+	if got.BaselinePath != "testdata/baseline.json" {
+		t.Fatalf("expected baseline path %q, got %q", "testdata/baseline.json", got.BaselinePath)
+	}
+	if !got.WriteBaseline {
+		t.Fatal("expected write-baseline to be true")
+	}
 }
 
 func TestParseAnalyzeRequiresOutPathForMultiFormat(t *testing.T) {
@@ -245,58 +248,65 @@ func assertDefaultConfig(t *testing.T, got cli.Config, configPath string) {
 	if got.ConfigPath != configPath {
 		t.Fatalf("expected config path %q, got %q", configPath, got.ConfigPath)
 	}
-	if len(got.Roots) != 1 || got.Roots[0] != "." {
-		t.Fatalf("expected default root '.', got %v", got.Roots)
-	}
-	if len(got.Formats) != 1 || got.Formats[0] != "console" {
-		t.Fatalf("expected default format [console], got %v", got.Formats)
-	}
+	assertDefaultRoots(t, got.Roots)
+	assertDefaultFormats(t, got.Formats)
 	if got.Concurrency != runtime.GOMAXPROCS(0) {
 		t.Fatalf("expected concurrency %d, got %d", runtime.GOMAXPROCS(0), got.Concurrency)
 	}
 	if got.MaxFileSizeBytes != 5242880 {
 		t.Fatalf("expected max file size 5242880, got %d", got.MaxFileSizeBytes)
 	}
-	if got.OutJSON != "" || got.OutSARIF != "" {
+	assertDefaultOutputPaths(t, got)
+	assertDefaultBaselineSettings(t, got)
+}
+
+func assertDefaultRoots(t *testing.T, roots []string) {
+	t.Helper()
+
+	if len(roots) != 1 {
+		t.Fatalf("expected default root '.', got %v", roots)
+	}
+	if roots[0] != "." {
+		t.Fatalf("expected default root '.', got %v", roots)
+	}
+}
+
+func assertDefaultFormats(t *testing.T, formats []string) {
+	t.Helper()
+
+	if len(formats) != 1 {
+		t.Fatalf("expected default format [console], got %v", formats)
+	}
+	if formats[0] != "console" {
+		t.Fatalf("expected default format [console], got %v", formats)
+	}
+}
+
+func assertDefaultOutputPaths(t *testing.T, got cli.Config) {
+	t.Helper()
+
+	if got.OutJSON != "" {
 		t.Fatalf("expected empty output paths, got out-json=%q out-sarif=%q", got.OutJSON, got.OutSARIF)
 	}
-	assertConfigStringField(t, got, "BaselinePath", "")
-	assertConfigStringField(t, got, "RuleSetBaselinePath", "")
-	assertConfigStringField(t, got, "EffectiveBaselinePath", "")
-	assertConfigBoolField(t, got, "WriteBaseline", false)
-}
-
-func assertConfigStringField(t *testing.T, cfg cli.Config, fieldName, want string) {
-	t.Helper()
-
-	value := reflect.ValueOf(cfg)
-	field := value.FieldByName(fieldName)
-	if !field.IsValid() {
-		t.Fatalf("expected config to include %s field", fieldName)
-	}
-	if field.Kind() != reflect.String {
-		t.Fatalf("expected config field %s to be string, got %s", fieldName, field.Kind())
-	}
-
-	if field.String() != want {
-		t.Fatalf("expected config field %s=%q, got %q", fieldName, want, field.String())
+	if got.OutSARIF != "" {
+		t.Fatalf("expected empty output paths, got out-json=%q out-sarif=%q", got.OutJSON, got.OutSARIF)
 	}
 }
 
-func assertConfigBoolField(t *testing.T, cfg cli.Config, fieldName string, want bool) {
+func assertDefaultBaselineSettings(t *testing.T, got cli.Config) {
 	t.Helper()
 
-	value := reflect.ValueOf(cfg)
-	field := value.FieldByName(fieldName)
-	if !field.IsValid() {
-		t.Fatalf("expected config to include %s field", fieldName)
+	if got.BaselinePath != "" {
+		t.Fatalf("expected empty baseline path, got %q", got.BaselinePath)
 	}
-	if field.Kind() != reflect.Bool {
-		t.Fatalf("expected config field %s to be bool, got %s", fieldName, field.Kind())
+	if got.RuleSetBaselinePath != "" {
+		t.Fatalf("expected empty ruleset baseline path, got %q", got.RuleSetBaselinePath)
 	}
-
-	if field.Bool() != want {
-		t.Fatalf("expected config field %s=%t, got %t", fieldName, want, field.Bool())
+	if got.EffectiveBaselinePath != "" {
+		t.Fatalf("expected empty effective baseline path, got %q", got.EffectiveBaselinePath)
+	}
+	if got.WriteBaseline {
+		t.Fatal("expected write-baseline to be false")
 	}
 }
 

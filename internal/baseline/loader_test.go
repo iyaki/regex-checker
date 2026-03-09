@@ -144,6 +144,23 @@ func TestLoadRejectsInvalidEntries(t *testing.T) {
 	}
 }
 
+func TestLoadAllowsDistinctEntriesWithEmbeddedNullCharacters(t *testing.T) {
+	t.Parallel()
+
+	path := writeBaselineFile(t, `{
+		"schemaVersion": 1,
+		"entries": [
+			{"filePath": "src/a", "message": "m1\u0000tail", "count": 1},
+			{"filePath": "src/a\u0000m1", "message": "tail", "count": 1}
+		]
+	}`)
+
+	_, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
 func TestValidateRawDocument(t *testing.T) {
 	t.Parallel()
 

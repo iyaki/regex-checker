@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -259,9 +258,15 @@ func TestRunAnalyzeResolvesRuleSetBaselinePathFromConfigDirectory(t *testing.T) 
 	assertNoError(t, err)
 
 	want := filepath.Join(configDir, "baselines", "current.json")
-	assertConfigStringFieldValue(t, cfg, "RuleSetBaselinePath", want)
-	assertConfigStringFieldValue(t, cfg, "EffectiveBaselinePath", want)
-	assertConfigStringFieldValue(t, cfg, "BaselinePath", "")
+	if cfg.RuleSetBaselinePath != want {
+		t.Fatalf("expected RuleSetBaselinePath %q, got %q", want, cfg.RuleSetBaselinePath)
+	}
+	if cfg.EffectiveBaselinePath != want {
+		t.Fatalf("expected EffectiveBaselinePath %q, got %q", want, cfg.EffectiveBaselinePath)
+	}
+	if cfg.BaselinePath != "" {
+		t.Fatalf("expected empty BaselinePath, got %q", cfg.BaselinePath)
+	}
 }
 
 func TestRunAnalyzeResolvesCLIBaselinePathFromWorkingDirectory(t *testing.T) {
@@ -302,9 +307,15 @@ func TestRunAnalyzeResolvesCLIBaselinePathFromWorkingDirectory(t *testing.T) {
 	assertNoError(t, err)
 
 	want := filepath.Join(cwd, baselineArg)
-	assertConfigStringFieldValue(t, cfg, "BaselinePath", want)
-	assertConfigStringFieldValue(t, cfg, "EffectiveBaselinePath", want)
-	assertConfigStringFieldValue(t, cfg, "RuleSetBaselinePath", "")
+	if cfg.BaselinePath != want {
+		t.Fatalf("expected BaselinePath %q, got %q", want, cfg.BaselinePath)
+	}
+	if cfg.EffectiveBaselinePath != want {
+		t.Fatalf("expected EffectiveBaselinePath %q, got %q", want, cfg.EffectiveBaselinePath)
+	}
+	if cfg.RuleSetBaselinePath != "" {
+		t.Fatalf("expected empty RuleSetBaselinePath, got %q", cfg.RuleSetBaselinePath)
+	}
 }
 
 func TestRunAnalyzePrefersCLIBaselineOverRuleSetBaseline(t *testing.T) {
@@ -352,9 +363,15 @@ func TestRunAnalyzePrefersCLIBaselineOverRuleSetBaseline(t *testing.T) {
 
 	wantCLI := filepath.Join(cwd, cliBaseline)
 	wantRuleSet := filepath.Join(configDir, "config", "baseline.json")
-	assertConfigStringFieldValue(t, cfg, "BaselinePath", wantCLI)
-	assertConfigStringFieldValue(t, cfg, "RuleSetBaselinePath", wantRuleSet)
-	assertConfigStringFieldValue(t, cfg, "EffectiveBaselinePath", wantCLI)
+	if cfg.BaselinePath != wantCLI {
+		t.Fatalf("expected BaselinePath %q, got %q", wantCLI, cfg.BaselinePath)
+	}
+	if cfg.RuleSetBaselinePath != wantRuleSet {
+		t.Fatalf("expected RuleSetBaselinePath %q, got %q", wantRuleSet, cfg.RuleSetBaselinePath)
+	}
+	if cfg.EffectiveBaselinePath != wantCLI {
+		t.Fatalf("expected EffectiveBaselinePath %q, got %q", wantCLI, cfg.EffectiveBaselinePath)
+	}
 }
 
 func TestRunAnalyzeWriteBaselineRequiresEffectiveBaselinePath(t *testing.T) {
@@ -900,22 +917,5 @@ func assertFilesScannedNonNegative(t *testing.T, filesScanned int) {
 
 	if filesScanned < 0 {
 		t.Fatalf("unexpected files scanned: %d", filesScanned)
-	}
-}
-
-func assertConfigStringFieldValue(t *testing.T, cfg Config, fieldName, want string) {
-	t.Helper()
-
-	value := reflect.ValueOf(cfg)
-	field := value.FieldByName(fieldName)
-	if !field.IsValid() {
-		t.Fatalf("expected config to include %s field", fieldName)
-	}
-	if field.Kind() != reflect.String {
-		t.Fatalf("expected config field %s to be string, got %s", fieldName, field.Kind())
-	}
-
-	if field.String() != want {
-		t.Fatalf("expected config field %s=%q, got %q", fieldName, want, field.String())
 	}
 }

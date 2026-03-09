@@ -190,8 +190,8 @@ func TestLoadRuleSetRejectsNonStringBaseline(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "baseline") {
-		t.Fatalf("expected baseline validation error, got %v", err)
+	if err.Error() != "baseline must be a string" {
+		t.Fatalf("expected baseline type validation error, got %v", err)
 	}
 }
 
