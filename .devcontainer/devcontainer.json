@@ -79,15 +79,11 @@
 		"ghcr.io/devcontainers/features/go:": {
 			"version": "1.25"
 		},
-		// "ghcr.io/devcontainers/features/git:1": {
-		// 	"version": "latest"
-		// },
 		"ghcr.io/devcontainers-extra/features/shfmt:1": {},
 		"ghcr.io/devcontainers-extra/features/npm-packages:1": {
-			"packages": "agent-browser,repomix"
-			// "packages": "opencode-ai,@github/copilot,@google/gemini-cli,@covibes/zeroshot,agent-browser,repomix"
+			"packages": "repomix"
 		},
-		"ghcr.io/devcontainers-extra/features/uv:1": {},
+		// "ghcr.io/devcontainers-extra/features/uv:1": {},
 		"ghcr.io/devcontainers-extra/features/opencode:1": {},
 		"ghcr.io/iyaki/devcontainer-features/opencode-ralph:1": {}
 	},
@@ -97,8 +93,8 @@
 			"extensions": [
 				"sst-dev.opencode",
 				"editorconfig.editorconfig",
-				"nhoizey.gremlins",
-				"GitHub.copilot-chat"
+				"golang.go",
+				"nhoizey.gremlins"
 			]
 		}
 	},
@@ -106,7 +102,6 @@
 	"initializeCommand": "${localWorkspaceFolder}/.devcontainer/setup.sh",
 	"postCreateCommand": {
 		"Install npm packages": "npm install",
-		"Setup agent browser": "agent-browser install --with-deps",
 		"Install go tools": "/bin/bash .devcontainer/install-go-tools.sh",
 		"Setup lefthook": "/go/bin/lefthook install"
 	},
