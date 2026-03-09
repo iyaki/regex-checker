@@ -1,6 +1,6 @@
 # Implementation Plan (ansi-colors)
 
-**Status:** ANSI color scope is largely implemented; explicit console ANSI reset coverage is now in place and final quality work remains (4/6 phases complete, Phase 5 in progress)
+**Status:** ANSI color scope implementation is complete through test and docs alignment; final repository-wide verification remains (5/6 phases complete, Phase 6 pending)
 **Last Updated:** 2026-03-09
 **Primary Specs:** `specs/formatter-console.md`, `specs/configuration.md`, `specs/cli-analyze.md` (related: `specs/formatter.md`, `specs/testing-and-validations.md`)
 
@@ -135,14 +135,14 @@
 ## Phase 5: Tests, fixtures, and docs alignment
 
 **Goal:** Add explicit ansi-colors coverage and keep docs/examples aligned.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `internal/output/*_test.go`, `internal/cli/*_test.go`, `internal/config/*_test.go`, `testdata/golden/*`, `testdata/rules/*`, `README.md`
 **Reference pattern:** `internal/output/golden_test.go`
 
 ### 5.1 Automated coverage
 
 - [x] Add console tests for enabled ANSI emission and reset behavior.
-- [ ] Add console tests for config-disabled mode (no ANSI).
+- [x] Add console tests for config-disabled mode (no ANSI).
 - [x] Add CLI tests for `NO_COLOR` precedence over config and config-disabled behavior with `NO_COLOR` unset.
 - [x] Add config tests for `consoleColorsEnabled` parse/validation behavior.
 - [x] Baseline tests for output/cli/config suites already exist.
@@ -265,6 +265,10 @@
 - 2026-03-09: go test ./internal/output -run TestWriteConsoleWithSettingsResetsANSIColorPerSeverityLabel - pass.
 - 2026-03-09: go test ./internal/output - pass.
 - 2026-03-09: git commit -m "Add console ANSI reset coverage" - success (commit `f42626e`).
+- 2026-03-09: Read specs/README.md, specs/formatter-console.md, specs/testing-and-validations.md, IMPLEMENTATION_PLAN.md - confirmed highest-priority single remaining task was explicit console coverage for config-disabled mode.
+- 2026-03-09: go test ./internal/output -run TestWriteConsoleWithSettingsConfigDisabledModeHasNoANSI - pass.
+- 2026-03-09: go test ./internal/output ./internal/cli ./internal/config - pass.
+- 2026-03-09: git commit -m "Add console coverage for config-disabled colors" - success (commit `e2c5fe9`).
 
 ## Summary
 
@@ -274,10 +278,10 @@
 | Phase 2: RuleSet schema and model propagation | Complete    |
 | Phase 3: Analyze command color resolution     | Complete    |
 | Phase 4: Console ANSI rendering               | Complete    |
-| Phase 5: Tests, fixtures, and docs alignment  | In progress |
+| Phase 5: Tests, fixtures, and docs alignment  | Complete    |
 | Phase 6: Final verification and quality gates | Not started |
 
-**Remaining effort:** Complete remaining Phase 5 checklist closure, then execute Phase 6 final repository-wide quality verification.
+**Remaining effort:** Execute Phase 6 final repository-wide quality verification and close quality gates.
 
 ## Known Existing Work
 
@@ -287,6 +291,7 @@
 - CLI coverage now explicitly verifies `consoleColorsEnabled: false` disables ANSI when `NO_COLOR` is unset (`internal/cli/analyze_handle_test.go`).
 - Config coverage now explicitly verifies `consoleColorsEnabled: true|false` parsing and rejects non-boolean values including `null` (`internal/config/loader_test.go`, `internal/config/loader.go`).
 - Console output coverage now explicitly verifies one ANSI reset per colored severity label and no ANSI bleed into path lines (`internal/output/console_test.go`).
+- Console output coverage now explicitly verifies config-disabled mode emits no ANSI sequences while preserving severity line formatting (`internal/output/console_test.go`).
 - `reglint init` default template now includes `consoleColorsEnabled: true` so generated quickstart configs match documented color defaults.
 - JSON and SARIF formatters already avoid ANSI concerns (`internal/output/json.go`, `internal/output/sarif.go`).
 - Baseline output/CLI/config tests and golden tests already exist and can be extended (`internal/output/golden_test.go`, `testdata/golden/*`).
