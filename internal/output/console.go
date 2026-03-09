@@ -61,8 +61,14 @@ func writeConsole(result scan.Result, settings ConsoleColorSettings, out io.Writ
 		if left.Severity != right.Severity {
 			return severityRank(left.Severity) < severityRank(right.Severity)
 		}
+		if left.Message != right.Message {
+			return left.Message < right.Message
+		}
+		if left.Root != right.Root {
+			return left.Root < right.Root
+		}
 
-		return left.Message < right.Message
+		return left.RuleIndex < right.RuleIndex
 	})
 
 	var builder strings.Builder

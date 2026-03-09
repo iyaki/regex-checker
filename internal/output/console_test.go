@@ -96,6 +96,62 @@ func TestWriteConsoleOrdersAndGroupsMatches(t *testing.T) {
 	assertConsoleOutput(t, buffer.String(), expectedGroupedOutput(t))
 }
 
+func TestWriteConsoleDeterministicAcrossEquivalentSortKeys(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	rootA := filepath.Join(base, "a-root")
+	rootB := filepath.Join(base, "b-root")
+
+	left := scan.Match{
+		Message:  "Duplicate msg",
+		Severity: "warning",
+		FilePath: "src/file.go",
+		Root:     rootA,
+		Line:     3,
+		Column:   7,
+	}
+	right := left
+	right.Root = rootB
+
+	resultAB := scan.Result{
+		Matches: []scan.Match{left, right},
+		Stats: scan.Stats{
+			FilesScanned: 2,
+			FilesSkipped: 0,
+			Matches:      2,
+			DurationMs:   4,
+		},
+	}
+	resultBA := scan.Result{
+		Matches: []scan.Match{right, left},
+		Stats: scan.Stats{
+			FilesScanned: 2,
+			FilesSkipped: 0,
+			Matches:      2,
+			DurationMs:   4,
+		},
+	}
+
+	var bufferAB bytes.Buffer
+	if err := WriteConsole(resultAB, &bufferAB); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var bufferBA bytes.Buffer
+	if err := WriteConsole(resultBA, &bufferBA); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if bufferAB.String() != bufferBA.String() {
+		t.Fatalf(
+			"expected deterministic output regardless of input order\nAB:\n%s\nBA:\n%s",
+			bufferAB.String(),
+			bufferBA.String(),
+		)
+	}
+}
+
 func TestWriteConsoleWithSettingsAppliesANSISeverityColors(t *testing.T) {
 	t.Parallel()
 
