@@ -1,11 +1,13 @@
 
 
-.PHONY: help quality all format lint test coverage test-coverage test-race mutation test-mutation \
+
+.PHONY: help quality all format lint test coverage test-coverage test-race test-flaky mutation test-mutation \
 	security arch build run analyze-example analyze-fail
 
 GLOBAL_TARGETS ?=
 BUILD_OUT ?= bin/reglint
 ARGS ?=
+FLAKY_COUNT ?=20
 
 help:
 	@printf "%s\n" \
@@ -15,6 +17,7 @@ help:
 	"  make lint            Run golangci-lint" \
 	"  make test            Run tests with coverage gate" \
 	"  make test-race       Run tests with race detector" \
+	"  make test-flaky      Run tests repeatedly to detect flakes" \
 	"  make coverage        Run coverage gate only" \
 	"  make mutation        Run mutation testing (final stage)" \
 	"  make security        Run govulncheck and gosec" \
@@ -24,7 +27,7 @@ help:
 	"  make analyze-example Analyze test fixtures with example config" \
 	"  make analyze-fail    Analyze test fixtures with failOn config"
 
-quality: test lint test-race test-coverage test-mutation security arch
+quality: test lint test-race test-flaky test-coverage test-mutation security arch
 
 format:
 	gofmt -w $$(git ls-files '*.go')
@@ -49,6 +52,9 @@ test-coverage:
 
 test-race:
 	go test -race ./...
+
+test-flaky:
+	go test -count=$(FLAKY_COUNT) -shuffle=on ./...
 
 test-mutation:
 	gremlins unleash $(ARGS)

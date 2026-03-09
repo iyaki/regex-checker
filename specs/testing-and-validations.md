@@ -58,6 +58,7 @@ Targeted runs:
 make lint
 make test
 make test-race
+make test-flaky
 make coverage
 make mutation
 make security
@@ -186,6 +187,7 @@ make arch
 ## Test Execution
 
 - `make test` runs unit and integration tests.
+- `make test-flaky` reruns the full test suite with shuffle to catch flaky behavior (`FLAKY_COUNT` default `20`).
 - Optional: `UPDATE_GOLDEN=1 make test` to refresh golden files.
 - Unit tests must enforce line coverage > 90% (exclude integration and testdata packages).
 - Mutation testing must meet the minimum mutation score.
