@@ -1,6 +1,6 @@
 # Implementation Plan (baseline)
 
-**Status:** Baseline feature set is partially implemented in runtime code (Discovery complete, 1/8 phases complete; Phase 3 in progress with 3.1 and 3.3 complete)
+**Status:** Baseline feature set is partially implemented in runtime code (Discovery complete, 2/8 phases complete; Phase 3 in progress with 3.1 and 3.3 complete)
 **Last Updated:** 2026-03-09
 **Primary Specs:** `specs/cli-analyze-baseline.md`, `specs/cli-analyze.md`, `specs/configuration.md` (related: `specs/testing-and-validations.md`, `specs/cli-help.md`, `specs/cli.md`, `specs/core-architecture.md`, `specs/formatter.md`)
 
@@ -10,7 +10,7 @@
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------ |
 | Baseline domain model, loader, comparator, writer                          | `specs/cli-analyze-baseline.md`, `specs/core-architecture.md`                                      | `internal/baseline/*`                                                                                          | `testdata/baseline/*.json`        | In progress (model + loader + writer implemented; compare pending) |
 | Analyze baseline flags and control flow (`--baseline`, `--write-baseline`) | `specs/cli-analyze.md`, `specs/cli.md`                                                             | `internal/cli/analyze.go`, `cmd/reglint/main.go`                                                               | CLI integration tests             | Missing (flags and flow not present)                               |
-| RuleSet baseline config field and propagation                              | `specs/configuration.md`, `specs/cli-analyze.md`                                                   | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` | `testdata/rules/*.yaml`           | Missing (`baseline` field absent)                                  |
+| RuleSet baseline config field and propagation                              | `specs/configuration.md`, `specs/cli-analyze.md`                                                   | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` | `testdata/rules/*.yaml`           | ✅ Implemented (field + validation + propagation complete)         |
 | Help output coverage for baseline flags                                    | `specs/cli-help.md`, `specs/cli-analyze.md`                                                        | `internal/cli/help.go`, `internal/cli/cli_test.go`                                                             | Help snapshot assertions in tests | Missing (help text does not include baseline flags)                |
 | Scan + formatter deterministic pipeline dependency                         | `specs/data-model.md`, `specs/formatter.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/scan/engine.go`, `internal/output/*.go`                                                              | `testdata/golden/*`               | ✅ Implemented (reusable baseline dependency)                      |
 | Existing analyze routing, fail-on behavior, and output selection           | `specs/cli-analyze.md`                                                                             | `internal/cli/analyze.go`, `internal/cli/analyze_output_test.go`, `cmd/reglint/main_test.go`                   | Existing CLI tests                | ✅ Implemented (baseline extension point)                          |
@@ -47,21 +47,21 @@
 ## Phase 2: RuleSet schema and baseline path propagation
 
 **Goal:** Add baseline path support in config models and enforce schema validation.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `internal/config/model.go`, `internal/config/loader.go`, `internal/config/loader_test.go`, `internal/config/rules.go`, `internal/rules/model.go`
 **Reference pattern:** `internal/config/model.go` and `internal/config/rules.go` existing global field propagation (`failOn`, `concurrency`, `consoleColorsEnabled`)
 
 ### 2.1 RuleSet schema updates
 
-- [ ] Add `baseline` to `config.RuleSet` and `rules.RuleSet`.
-- [ ] Keep field optional but reject empty/whitespace values when provided.
-- [ ] Propagate value through `RuleSet.ToRules()` with existing copy semantics.
+- [x] Add `baseline` to `config.RuleSet` and `rules.RuleSet`.
+- [x] Keep field optional but reject empty/whitespace values when provided.
+- [x] Propagate value through `RuleSet.ToRules()` with existing copy semantics.
 
 ### 2.2 Validation and conversion tests
 
-- [ ] Add loader tests for valid baseline path values.
-- [ ] Add loader tests for invalid baseline path shapes (empty/non-string).
-- [ ] Add conversion tests confirming baseline propagation and immutability.
+- [x] Add loader tests for valid baseline path values.
+- [x] Add loader tests for invalid baseline path shapes (empty/non-string).
+- [x] Add conversion tests confirming baseline propagation and immutability.
 
 **Definition of Done**
 
@@ -297,13 +297,16 @@
 - 2026-03-09: make test-coverage - pass.
 - 2026-03-09: make mutation ARGS="--diff HEAD" - pass (test efficacy 88.24%, mutator coverage 100%).
 - 2026-03-09: git commit -m "Add deterministic baseline writer generation" -- internal/baseline/writer.go internal/baseline/writer_test.go - success.
+- 2026-03-09: go test ./internal/config ./internal/rules - pass.
+- 2026-03-09: make lint - pass.
+- 2026-03-09: git commit -m "Add baseline path support to rules configuration" -- internal/config/model.go internal/config/rules.go internal/config/loader.go internal/config/loader_test.go internal/rules/model.go - success.
 
 ## Summary
 
 | Phase                                                                       | Status      |
 | --------------------------------------------------------------------------- | ----------- |
 | Phase 1: Scope verification and plan reset                                  | Complete    |
-| Phase 2: RuleSet schema and baseline path propagation                       | Not started |
+| Phase 2: RuleSet schema and baseline path propagation                       | Complete    |
 | Phase 3: Baseline package implementation (`internal/baseline`)              | In progress |
 | Phase 4: Analyze CLI flags, precedence, and path resolution                 | Not started |
 | Phase 5: Analyze runtime integration (compare/write modes + exit semantics) | Not started |
@@ -311,7 +314,7 @@
 | Phase 7: End-to-end tests and regression coverage                           | Not started |
 | Phase 8: Final quality gates and release readiness                          | Not started |
 
-**Remaining effort:** Implement Phase 2, complete remaining Phase 3 comparison work, and implement Phases 4-8.
+**Remaining effort:** Complete remaining Phase 3 comparison work, and implement Phases 4-8.
 
 ## Known Existing Work
 
@@ -320,6 +323,7 @@
 - `internal/output/console.go`, `internal/output/json.go`, and `internal/output/sarif.go` already provide deterministic formatter behavior and should remain schema-compatible.
 - `internal/cli/help.go` and `internal/cli/cli_test.go` already provide deterministic help rendering patterns that baseline flags can extend.
 - `internal/config/loader.go` + `internal/config/loader_test.go` already provide strong schema validation scaffolding for additional RuleSet fields.
+- `internal/config/model.go`, `internal/config/rules.go`, and `internal/rules/model.go` now support RuleSet `baseline` propagation with copy-safe conversion.
 - `cmd/reglint/main_test.go` already contains command-level integration tests that can be extended for baseline behavior.
 - `internal/baseline/model.go` and `internal/baseline/loader.go` now provide baseline document structures and strict load/validation behavior.
 - `internal/baseline/writer.go` now provides deterministic baseline generation and canonical JSON overwrite behavior.
