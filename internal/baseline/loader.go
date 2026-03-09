@@ -9,7 +9,14 @@ import (
 	"strings"
 )
 
-const baselineSchemaVersion = 1
+const (
+	baselineSchemaVersion = 1
+
+	windowsDrivePrefixLen  = 3
+	windowsDriveLetterIdx  = 0
+	windowsDriveSeparator  = 1
+	windowsAbsolutePathIdx = 2
+)
 
 type baselineDocumentRaw struct {
 	SchemaVersion *int     `json:"schemaVersion"`
@@ -92,6 +99,7 @@ func validateEntryFilePath(filePath string) (string, error) {
 	normalized := path.Clean(strings.ReplaceAll(trimmed, "\\", "/"))
 	if strings.HasPrefix(normalized, "/") ||
 		filepath.IsAbs(trimmed) ||
+		isWindowsAbsolutePath(normalized) ||
 		normalized == "." ||
 		normalized == ".." ||
 		strings.HasPrefix(normalized, "../") {
@@ -102,4 +110,17 @@ func validateEntryFilePath(filePath string) (string, error) {
 	}
 
 	return normalized, nil
+}
+
+func isWindowsAbsolutePath(value string) bool {
+	if len(value) < windowsDrivePrefixLen {
+		return false
+	}
+
+	drive := value[windowsDriveLetterIdx]
+	if (drive < 'A' || drive > 'Z') && (drive < 'a' || drive > 'z') {
+		return false
+	}
+
+	return value[windowsDriveSeparator] == ':' && value[windowsAbsolutePathIdx] == '/'
 }
