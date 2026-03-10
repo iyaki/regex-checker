@@ -1,6 +1,6 @@
 # Implementation Plan (git-integration)
 
-**Status:** Git integration implementation in progress (Phase 14 in progress; 5/6 phases complete)
+**Status:** Git integration implementation complete (Phase 14 complete; 6/6 phases complete)
 **Last Updated:** 2026-03-10
 **Primary Specs:** `specs/git-integration.md` (related: `specs/cli-analyze.md`, `specs/configuration.md`, `specs/data-model.md`, `specs/ignore-files.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md`)
 
@@ -15,7 +15,7 @@
 | Ignore-file engine foundation (`.ignore`, `.reglintignore`)                                              | `specs/ignore-files.md`                                                                            | `internal/ignore/*`, `internal/scan/ignore_rules.go`                                                           | `internal/ignore/*_test.go`, `internal/scan/ignore_test.go`      | ✅ Implemented (reusable precedence foundation for Git mode)                                                              |
 | Deterministic scan ordering and formatter contracts                                                      | `specs/data-model.md`, `specs/formatter.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/scan/engine.go`, `internal/output/*`                                                                 | golden/output tests                                              | ✅ Implemented                                                                                                            |
 | Baseline compare/write behavior (related analyze flow)                                                   | `specs/cli-analyze-baseline.md`, `specs/cli-analyze.md`                                            | `internal/baseline/*`, `internal/cli/analyze.go`                                                               | `testdata/baseline/*`, baseline tests                            | ✅ Implemented                                                                                                            |
-| Git-focused docs and fixtures                                                                            | `specs/cli-analyze.md`, `specs/testing-and-validations.md`                                         | `README.md`, `testdata/rules/*`, `testdata/fixtures/*`                                                         | git-mode fixtures/examples                                       | In progress (README Git examples/exit behavior added; fixture additions pending)                                          |
+| Git-focused docs and fixtures                                                                            | `specs/cli-analyze.md`, `specs/testing-and-validations.md`                                         | `README.md`, `testdata/rules/*`, `testdata/fixtures/*`, `Makefile`                                             | git-mode fixtures/examples, quality-gate evidence                | ✅ Implemented (README examples, Git fixtures, and quality-gate evidence complete)                                        |
 
 ## Phase 9: Scope lock and stale-plan reset
 
@@ -162,7 +162,7 @@
 ## Phase 14: Integration verification, docs, and quality gates
 
 **Goal:** Close remaining gaps with end-to-end coverage, docs alignment, and quality gate evidence.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `cmd/reglint/main_test.go`, `internal/cli/*_test.go`, `internal/scan/*_test.go`, `testdata/rules/*`, `testdata/fixtures/*`, `README.md`, `Makefile`
 **Reference pattern:** existing command-level integration harness in `cmd/reglint/main_test.go`
 
@@ -176,7 +176,7 @@
 
 - [x] Add README examples for Git mode usage and expected exit behavior.
 - [x] Ensure analyze help/output tests remain deterministic after Git flag additions.
-- [ ] Run and log `go test ./...`, `make test`, `make lint`, and `make quality`.
+- [x] Run and log `go test ./...`, `make test`, `make lint`, and `make quality`.
 
 **Definition of Done**
 
@@ -266,19 +266,26 @@
 - 2026-03-10: `go test ./cmd/reglint -run "TestRunShowsRootHelpForLongFlag|TestRunShowsRootHelpForShortFlag|TestRunShowsAnalyzeHelpForLongFlag|TestRunShowsAnalyseHelpForShortFlag|TestRunUnknownCommandWithHelpFlag"` - passed.
 - 2026-03-10: `go test ./internal/cli -run "TestRunShowsHelpForRootFlag|TestRunShowsHelpForAnalyzeFlag|TestRunShowsHelpForAnalyseFlag|TestRunUnknownCommandWithHelpFlag"` - passed.
 - 2026-03-10: `go test ./cmd/reglint` - passed.
+- 2026-03-10: `go test ./...` - passed.
+- 2026-03-10: `make test` - passed.
+- 2026-03-10: `make lint` - passed.
+- 2026-03-10: `make quality` - failed (`Coverage 89.9% is below required 90%`) due cached coverage instrumentation.
+- 2026-03-10: `go clean -testcache && go test -count=1 -coverprofile=<tmp> -covermode=atomic -coverpkg=./... ./... && go tool cover -func=<tmp>` - passed (`total: 93.3%`).
+- 2026-03-10: `make quality` - passed after updating `Makefile` coverage gate to run uncached tests (`go test -count=1 ...`).
+- 2026-03-10: `git commit -m "Stabilize coverage gate with uncached tests"` - passed (commit `eaab4dd`).
 
 ## Summary
 
-| Phase                                                       | Status      |
-| ----------------------------------------------------------- | ----------- |
-| Phase 9: Scope lock and stale-plan reset                    | Complete    |
-| Phase 10: RuleSet and shared model contracts                | Complete    |
-| Phase 11: Analyze CLI flags and settings precedence         | Complete    |
-| Phase 12: Git adapter and hook infrastructure               | Complete    |
-| Phase 13: Scan engine and ignore precedence integration     | Complete    |
-| Phase 14: Integration verification, docs, and quality gates | In progress |
+| Phase                                                       | Status   |
+| ----------------------------------------------------------- | -------- |
+| Phase 9: Scope lock and stale-plan reset                    | Complete |
+| Phase 10: RuleSet and shared model contracts                | Complete |
+| Phase 11: Analyze CLI flags and settings precedence         | Complete |
+| Phase 12: Git adapter and hook infrastructure               | Complete |
+| Phase 13: Scan engine and ignore precedence integration     | Complete |
+| Phase 14: Integration verification, docs, and quality gates | Complete |
 
-**Remaining effort:** Complete Phase 14.
+**Remaining effort:** None.
 
 ## Known Existing Work
 
