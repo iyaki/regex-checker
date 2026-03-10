@@ -43,6 +43,76 @@ func TestRunUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestRunShowsRootHelpForLongFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := run([]string{"--help"}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if output.String() != expectedRootHelpOutput() {
+		t.Fatalf("unexpected root help output: %q", output.String())
+	}
+}
+
+func TestRunShowsRootHelpForShortFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := run([]string{"-h"}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if output.String() != expectedRootHelpOutput() {
+		t.Fatalf("unexpected root help output: %q", output.String())
+	}
+}
+
+func TestRunShowsAnalyzeHelpForLongFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := run([]string{"analyze", "--help"}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if output.String() != expectedAnalyzeHelpOutput() {
+		t.Fatalf("unexpected analyze help output: %q", output.String())
+	}
+}
+
+func TestRunShowsAnalyseHelpForShortFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := run([]string{"analyse", "-h"}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if output.String() != expectedAnalyzeHelpOutput() {
+		t.Fatalf("unexpected analyse help output: %q", output.String())
+	}
+}
+
+func TestRunUnknownCommandWithHelpFlag(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	code := run([]string{"bogus", "--help"}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if output.String() != "Unknown command: bogus\n" {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
 func TestRunRoutesAnalyze(t *testing.T) {
 	t.Parallel()
 
@@ -1342,4 +1412,41 @@ func assertSingleErrorMessage(t *testing.T, got string) {
 	if strings.Contains(trimmed, "\n") {
 		t.Fatalf("expected a single-line error message, got %q", got)
 	}
+}
+
+func expectedRootHelpOutput() string {
+	return "Usage:\n" +
+		"  reglint <command> [flags]\n" +
+		"\n" +
+		"Commands:\n" +
+		"  analyze (alias: analyse)\n" +
+		"  init\n" +
+		"\n" +
+		"Flags:\n" +
+		"  -h, --help bool (default false)  Print help and exit.\n"
+}
+
+func expectedAnalyzeHelpOutput() string {
+	return "Usage:\n" +
+		"  reglint analyze [flags] [path ...]\n" +
+		"  reglint analyse [flags] [path ...]\n" +
+		"\n" +
+		"Flags:\n" +
+		"  -h, --help bool (default false)  Print help and exit.\n" +
+		"  -c, --config string (default reglint-rules.yaml)  Path to YAML rules config file.\n" +
+		"  -f, --format string (default console)  Comma-separated list of formats.\n" +
+		"      --out-json string (default none)  Output path for JSON results.\n" +
+		"      --out-sarif string (default none)  Output path for SARIF results.\n" +
+		"      --include string (default none)  Repeatable include glob.\n" +
+		"      --exclude string (default none)  Repeatable exclude glob.\n" +
+		"      --concurrency int (default GOMAXPROCS)  Worker count.\n" +
+		"      --max-file-size int (default 5242880)  Maximum file size in bytes.\n" +
+		"      --fail-on string (default none)  Fail if matches at or above severity.\n" +
+		"      --baseline string (default none)  Baseline JSON path for suppression.\n" +
+		"      --write-baseline bool (default false)  Generate/regenerate baseline from findings.\n" +
+		"      --git-mode string (default off)  Select Git mode: off, staged, or diff.\n" +
+		"      --git-diff string (default none)  Diff target/range for --git-mode=diff.\n" +
+		"      --git-added-lines-only bool (default false)  Restrict matches to added lines in Git mode.\n" +
+		"      --no-gitignore bool (default false)  Disable .gitignore filtering for this run.\n" +
+		"      --no-ignore-files bool (default false)  Disable ignore file loading and matching.\n"
 }
