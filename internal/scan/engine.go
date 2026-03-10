@@ -2,9 +2,11 @@ package scan
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -24,7 +26,8 @@ const (
 )
 
 const (
-	captureIndexPairSize = 2
+	captureIndexPairSize         = 2
+	windowsAbsolutePathMinLength = 3
 )
 
 func collectFiles(
@@ -34,56 +37,92 @@ func collectFiles(
 	matcher []ignore.IgnoreRule,
 	maxFileSizeBytes int64,
 ) ([]string, int, error) {
+	return collectFilesWithCandidates(roots, include, exclude, matcher, nil, maxFileSizeBytes)
+}
+
+func collectFilesWithCandidates(
+	roots []string,
+	include []string,
+	exclude []string,
+	matcher []ignore.IgnoreRule,
+	candidateSet map[string]struct{},
+	maxFileSizeBytes int64,
+) ([]string, int, error) {
 	var files []string
 	skipped := 0
 
 	for _, root := range roots {
-		root = filepath.Clean(root)
-		if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() {
-				return nil
-			}
-
-			relPath, err := filepath.Rel(root, path)
-			if err != nil {
-				return err
-			}
-			relPath = filepath.ToSlash(relPath)
-			if relPath == "." {
-				return nil
-			}
-
-			selected, fileSkipped, err := evaluateFile(
-				path,
-				relPath,
-				entry,
-				include,
-				exclude,
-				matcher,
-				maxFileSizeBytes,
-			)
-			if err != nil {
-				return err
-			}
-			if fileSkipped {
-				skipped++
-
-				return nil
-			}
-			if selected {
-				files = append(files, relPath)
-			}
-
-			return nil
-		}); err != nil {
+		rootFiles, rootSkipped, err := collectRootFiles(root, include, exclude, matcher, candidateSet, maxFileSizeBytes)
+		if err != nil {
 			return nil, 0, err
 		}
+
+		skipped += rootSkipped
+		files = append(files, rootFiles...)
 	}
 
 	sort.Strings(files)
+
+	return files, skipped, nil
+}
+
+func collectRootFiles(
+	root string,
+	include []string,
+	exclude []string,
+	matcher []ignore.IgnoreRule,
+	candidateSet map[string]struct{},
+	maxFileSizeBytes int64,
+) ([]string, int, error) {
+	root = filepath.Clean(root)
+	files := make([]string, 0)
+	skipped := 0
+
+	if err := filepath.WalkDir(root, func(filePath string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(root, filePath)
+		if err != nil {
+			return err
+		}
+		relPath = filepath.ToSlash(relPath)
+		if relPath == "." {
+			return nil
+		}
+		if !candidateSelected(relPath, candidateSet) {
+			return nil
+		}
+
+		selected, fileSkipped, err := evaluateFile(
+			filePath,
+			relPath,
+			entry,
+			include,
+			exclude,
+			matcher,
+			maxFileSizeBytes,
+		)
+		if err != nil {
+			return err
+		}
+		if fileSkipped {
+			skipped++
+
+			return nil
+		}
+		if selected {
+			files = append(files, relPath)
+		}
+
+		return nil
+	}); err != nil {
+		return nil, 0, err
+	}
 
 	return files, skipped, nil
 }
@@ -127,7 +166,15 @@ func Run(request Request) (Result, error) {
 		return Result{}, err
 	}
 
-	matches, filesScanned, filesSkipped, err := scanEntries(entries, compiled, request.Concurrency)
+	addedLinesOnly, addedLinesByFile := resolveAddedLinesFilter(request.Git)
+
+	matches, filesScanned, filesSkipped, err := scanEntries(
+		entries,
+		compiled,
+		request.Concurrency,
+		addedLinesOnly,
+		addedLinesByFile,
+	)
 	if err != nil {
 		return Result{}, err
 	}
@@ -155,26 +202,126 @@ func collectScanEntries(request Request) ([]fileEntry, int, []string, []string, 
 		return nil, 0, nil, nil, errors.New("include patterns required")
 	}
 
+	candidateSet, err := buildCandidateSet(request)
+	if err != nil {
+		return nil, 0, nil, nil, err
+	}
+
 	matcherByRoot, err := loadIgnoreRules(request)
 	if err != nil {
 		return nil, 0, nil, nil, err
 	}
 
-	entries, skipped, err := collectEntries(request.Roots, include, exclude, matcherByRoot, request.MaxFileSizeBytes)
+	entries, skipped, err := collectEntriesWithCandidates(
+		request.Roots,
+		include,
+		exclude,
+		matcherByRoot,
+		candidateSet,
+		request.MaxFileSizeBytes,
+	)
 	if err != nil {
 		return nil, 0, nil, nil, err
 	}
 
 	return entries, skipped, include, exclude, nil
 }
-func scanEntries(entries []fileEntry, compiled []compiledRule, concurrency int) ([]Match, int, int, error) {
+
+func buildCandidateSet(request Request) (map[string]struct{}, error) {
+	if request.Git == nil {
+		return nil, nil
+	}
+	mode := strings.TrimSpace(request.Git.Mode)
+	if mode == "" || mode == "off" {
+		return nil, nil
+	}
+
+	candidateSet := make(map[string]struct{}, len(request.Git.CandidateFiles))
+	for _, rawCandidate := range request.Git.CandidateFiles {
+		normalized, err := normalizeCandidatePath(rawCandidate)
+		if err != nil {
+			return nil, err
+		}
+		if normalized == "" {
+			continue
+		}
+
+		candidateSet[normalized] = struct{}{}
+	}
+
+	return candidateSet, nil
+}
+
+func normalizeCandidatePath(value string) (string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return "", nil
+	}
+
+	normalized = strings.ReplaceAll(normalized, "\\", "/")
+	normalized = strings.TrimPrefix(normalized, "./")
+	normalized = path.Clean(normalized)
+	if normalized == "." || normalized == "" {
+		return "", nil
+	}
+	if path.IsAbs(normalized) || isWindowsAbsolutePath(normalized) {
+		return "", fmt.Errorf("invalid git candidate file path %q", value)
+	}
+	if normalized == ".." || strings.HasPrefix(normalized, "../") {
+		return "", fmt.Errorf("invalid git candidate file path %q", value)
+	}
+
+	return normalized, nil
+}
+
+func isWindowsAbsolutePath(value string) bool {
+	if len(value) < windowsAbsolutePathMinLength {
+		return false
+	}
+	drive := value[0]
+	if !((drive >= 'a' && drive <= 'z') || (drive >= 'A' && drive <= 'Z')) {
+		return false
+	}
+
+	return value[1] == ':' && value[2] == '/'
+}
+
+func candidateSelected(relPath string, candidateSet map[string]struct{}) bool {
+	if candidateSet == nil {
+		return true
+	}
+
+	_, ok := candidateSet[relPath]
+
+	return ok
+}
+func resolveAddedLinesFilter(gitRequest *GitSelectionRequest) (bool, map[string]map[int]struct{}) {
+	if gitRequest == nil || !gitRequest.AddedLinesOnly {
+		return false, nil
+	}
+
+	mode := strings.TrimSpace(gitRequest.Mode)
+	if mode != "staged" && mode != "diff" {
+		return false, nil
+	}
+
+	return true, gitRequest.AddedLinesByFile
+}
+
+func scanEntries(
+	entries []fileEntry,
+	compiled []compiledRule,
+	concurrency int,
+	addedLinesOnly bool,
+	addedLinesByFile map[string]map[int]struct{},
+) ([]Match, int, int, error) {
 	var matches []Match
 	filesScanned := 0
 	filesSkipped := 0
 
 	concurrency = requestConcurrency(entries, compiled, concurrency)
 	if concurrency == 1 {
-		return scanEntriesSequential(entries, compiled)
+		return scanEntriesSequential(entries, compiled, addedLinesOnly, addedLinesByFile)
 	}
 
 	entryCh := make(chan scanEntryWork)
@@ -184,7 +331,7 @@ func scanEntries(entries []fileEntry, compiled []compiledRule, concurrency int) 
 	for i := 0; i < workerCount; i++ {
 		go func() {
 			for work := range entryCh {
-				result := scanEntry(work.entry, compiled, work.index)
+				result := scanEntry(work.entry, compiled, work.index, addedLinesOnly, addedLinesByFile)
 				resultCh <- result
 			}
 		}()
@@ -229,13 +376,18 @@ func matcherForRoot(matcherByRoot map[string][]ignore.IgnoreRule, root string) [
 	return matcherByRoot[root]
 }
 
-func scanEntriesSequential(entries []fileEntry, compiled []compiledRule) ([]Match, int, int, error) {
+func scanEntriesSequential(
+	entries []fileEntry,
+	compiled []compiledRule,
+	addedLinesOnly bool,
+	addedLinesByFile map[string]map[int]struct{},
+) ([]Match, int, int, error) {
 	var matches []Match
 	filesScanned := 0
 	filesSkipped := 0
 
 	for index, entry := range entries {
-		result := scanEntry(entry, compiled, index)
+		result := scanEntry(entry, compiled, index, addedLinesOnly, addedLinesByFile)
 		if result.err != nil {
 			return nil, 0, 0, result.err
 		}
@@ -251,7 +403,13 @@ func scanEntriesSequential(entries []fileEntry, compiled []compiledRule) ([]Matc
 	return matches, filesScanned, filesSkipped, nil
 }
 
-func scanEntry(entry fileEntry, compiled []compiledRule, entryIndex int) scanEntryResult {
+func scanEntry(
+	entry fileEntry,
+	compiled []compiledRule,
+	entryIndex int,
+	addedLinesOnly bool,
+	addedLinesByFile map[string]map[int]struct{},
+) scanEntryResult {
 	fullPath := filepath.Join(entry.root, filepath.FromSlash(entry.relPath))
 	contentBytes, err := readFile(fullPath)
 	if err != nil {
@@ -273,6 +431,9 @@ func scanEntry(entry fileEntry, compiled []compiledRule, entryIndex int) scanEnt
 		for _, index := range indices {
 			captures := buildCaptures(content, index)
 			line, column := lineColumnFromIndex(content, index[0])
+			if !shouldKeepMatchByAddedLines(addedLinesOnly, addedLinesByFile, entry.relPath, line) {
+				continue
+			}
 			message := rules.InterpolateMessage(rule.rule.Message, captures)
 
 			matches = append(matches, Match{
@@ -294,6 +455,26 @@ func scanEntry(entry fileEntry, compiled []compiledRule, entryIndex int) scanEnt
 		matches:    matches,
 		scanned:    true,
 	}
+}
+
+func shouldKeepMatchByAddedLines(
+	addedLinesOnly bool,
+	addedLinesByFile map[string]map[int]struct{},
+	filePath string,
+	line int,
+) bool {
+	if !addedLinesOnly {
+		return true
+	}
+
+	lineSet, ok := addedLinesByFile[filePath]
+	if !ok {
+		return false
+	}
+
+	_, keep := lineSet[line]
+
+	return keep
 }
 
 func requestConcurrency(entries []fileEntry, compiled []compiledRule, defaultValue int) int {
@@ -323,12 +504,30 @@ func collectEntries(
 	matcherByRoot map[string][]ignore.IgnoreRule,
 	maxFileSizeBytes int64,
 ) ([]fileEntry, int, error) {
+	return collectEntriesWithCandidates(roots, include, exclude, matcherByRoot, nil, maxFileSizeBytes)
+}
+
+func collectEntriesWithCandidates(
+	roots []string,
+	include []string,
+	exclude []string,
+	matcherByRoot map[string][]ignore.IgnoreRule,
+	candidateSet map[string]struct{},
+	maxFileSizeBytes int64,
+) ([]fileEntry, int, error) {
 	entries := make([]fileEntry, 0)
 	skipped := 0
 
 	for _, root := range roots {
 		matcher := matcherForRoot(matcherByRoot, root)
-		fileEntries, fileSkipped, isFile, err := collectFileEntry(root, include, exclude, matcher, maxFileSizeBytes)
+		fileEntries, fileSkipped, isFile, err := collectFileEntryWithCandidates(
+			root,
+			include,
+			exclude,
+			matcher,
+			candidateSet,
+			maxFileSizeBytes,
+		)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -339,7 +538,14 @@ func collectEntries(
 			continue
 		}
 
-		files, fileSkipped, err := collectFiles([]string{root}, include, exclude, matcher, maxFileSizeBytes)
+		files, fileSkipped, err := collectFilesWithCandidates(
+			[]string{root},
+			include,
+			exclude,
+			matcher,
+			candidateSet,
+			maxFileSizeBytes,
+		)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -367,6 +573,17 @@ func collectFileEntry(
 	matcher []ignore.IgnoreRule,
 	maxFileSizeBytes int64,
 ) ([]fileEntry, int, bool, error) {
+	return collectFileEntryWithCandidates(root, include, exclude, matcher, nil, maxFileSizeBytes)
+}
+
+func collectFileEntryWithCandidates(
+	root string,
+	include []string,
+	exclude []string,
+	matcher []ignore.IgnoreRule,
+	candidateSet map[string]struct{},
+	maxFileSizeBytes int64,
+) ([]fileEntry, int, bool, error) {
 	info, err := os.Stat(root)
 	if err != nil {
 		return nil, 0, false, err
@@ -381,6 +598,9 @@ func collectFileEntry(
 		return nil, 0, true, err
 	}
 	relPath = filepath.ToSlash(relPath)
+	if !candidateSelected(relPath, candidateSet) {
+		return nil, 0, true, nil
+	}
 	entry := fs.FileInfoToDirEntry(info)
 	selected, fileSkipped, err := evaluateFile(
 		root,

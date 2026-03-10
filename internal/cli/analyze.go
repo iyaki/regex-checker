@@ -577,9 +577,7 @@ func applyCandidateScope(request *scan.Request, context *hooks.RunContext, scope
 		return
 	}
 
-	if len(scope.CandidateFiles) > 0 {
-		request.Git.CandidateFiles = append([]string{}, scope.CandidateFiles...)
-	}
+	request.Git.CandidateFiles = append([]string{}, scope.CandidateFiles...)
 
 	request.Git.AddedLinesByFile = cloneAddedLinesByFile(scope.AddedLinesByFile)
 	context.AddedLinesByFile = request.Git.AddedLinesByFile

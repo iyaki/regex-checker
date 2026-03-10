@@ -66,6 +66,72 @@ func TestCollectEntriesCountsIgnoredFilesAsSkipped(t *testing.T) {
 	}
 }
 
+func TestCollectEntriesAppliesGitCandidateScopeBeforeIgnoreRules(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFileWithContent(t, filepath.Join(root, ".ignore"), "noncandidate.txt\n")
+	writeFileWithContent(t, filepath.Join(root, "candidate.txt"), "keep")
+	writeFileWithContent(t, filepath.Join(root, "noncandidate.txt"), "skip")
+
+	request := Request{
+		Roots:   []string{root},
+		Include: []string{"**/*.txt"},
+		Exclude: nil,
+		Ignore:  IgnoreSettings{Enabled: true, Files: []string{".ignore"}},
+		Git: &GitSelectionRequest{
+			Mode:           "staged",
+			CandidateFiles: []string{"candidate.txt"},
+		},
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	entries, skipped, _, _, err := collectScanEntries(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skipped != 0 {
+		t.Fatalf("expected 0 skipped files, got %d", skipped)
+	}
+
+	paths := entryPaths(entries)
+	if !reflect.DeepEqual(paths, []string{"candidate.txt"}) {
+		t.Fatalf("expected candidate.txt only, got %v", paths)
+	}
+}
+
+func TestCollectEntriesGitCandidateScopeEmptyReturnsNoEntries(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFileWithContent(t, filepath.Join(root, "candidate.txt"), "keep")
+
+	request := Request{
+		Roots:   []string{root},
+		Include: []string{"**/*.txt"},
+		Exclude: nil,
+		Ignore:  IgnoreSettings{Enabled: true, Files: []string{".ignore"}},
+		Git: &GitSelectionRequest{
+			Mode:           "staged",
+			CandidateFiles: []string{},
+		},
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	entries, skipped, _, _, err := collectScanEntries(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %d", len(entries))
+	}
+	if skipped != 0 {
+		t.Fatalf("expected 0 skipped files, got %d", skipped)
+	}
+}
+
 func TestCollectEntriesAllowsIgnoreNegation(t *testing.T) {
 	t.Parallel()
 

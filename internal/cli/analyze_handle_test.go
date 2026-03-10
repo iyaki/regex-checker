@@ -595,6 +595,53 @@ func TestRunAnalyzeSkipsGitSelectionHooksWhenModeOff(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeReturnsNoMatchesWhenGitCandidatesAreEmpty(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeConfig(t, sampleConfig())
+
+	restoreCapabilities := setCheckGitCapabilitiesHook(t, func(git.CapabilityRequest) error {
+		return nil
+	})
+	t.Cleanup(restoreCapabilities)
+
+	restoreCandidates := setSelectGitCandidateFilesHook(t, func(git.CandidateSelectionRequest) ([]string, error) {
+		return []string{}, nil
+	})
+	t.Cleanup(restoreCandidates)
+
+	restoreAddedLines := setSelectGitAddedLinesHook(
+		t,
+		func(git.CandidateSelectionRequest) (map[string]map[int]struct{}, error) {
+			return nil, nil
+		},
+	)
+	t.Cleanup(restoreAddedLines)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--git-mode", "staged",
+		rootDir,
+	})
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Matches) != 0 {
+		t.Fatalf("expected no matches for empty candidate scope, got %d", len(result.Matches))
+	}
+	if result.Stats.FilesScanned != 0 {
+		t.Fatalf("expected 0 scanned files for empty candidate scope, got %d", result.Stats.FilesScanned)
+	}
+}
+
 func TestRunAnalyzeReturnsSelectionHookErrorWhenGitEnabled(t *testing.T) {
 	t.Parallel()
 	setAnalyzeCwd(t)

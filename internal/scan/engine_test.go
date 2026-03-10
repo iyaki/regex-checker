@@ -271,6 +271,127 @@ func TestRunCapturesRuneLineAndColumn(t *testing.T) {
 	}
 }
 
+func TestRunFiltersMatchesByAddedLinesWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFileWithContent(t, filepath.Join(root, "sample.txt"), "token=aaa\ntoken=bbb\n")
+
+	request := Request{
+		Roots: []string{root},
+		Rules: []rules.Rule{
+			{
+				Message:  "Found $0",
+				Regex:    "token=[a-z]+",
+				Severity: "warning",
+				Paths:    []string{"**/*"},
+			},
+		},
+		Include: []string{"**/*"},
+		Git: &GitSelectionRequest{
+			Mode:           "staged",
+			CandidateFiles: []string{"sample.txt"},
+			AddedLinesOnly: true,
+			AddedLinesByFile: map[string]map[int]struct{}{
+				"sample.txt": {2: {}},
+			},
+		},
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	result, err := Run(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Matches) != 1 {
+		t.Fatalf("expected 1 match after added-lines filtering, got %d", len(result.Matches))
+	}
+	if result.Matches[0].Line != 2 {
+		t.Fatalf("expected remaining match on line 2, got %d", result.Matches[0].Line)
+	}
+}
+
+func TestRunAddedLinesOnlyDropsMatchesForFilesWithoutAddedLines(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFileWithContent(t, filepath.Join(root, "sample.txt"), "token=aaa\n")
+
+	request := Request{
+		Roots: []string{root},
+		Rules: []rules.Rule{
+			{
+				Message:  "Found $0",
+				Regex:    "token=[a-z]+",
+				Severity: "warning",
+				Paths:    []string{"**/*"},
+			},
+		},
+		Include: []string{"**/*"},
+		Git: &GitSelectionRequest{
+			Mode:             "diff",
+			CandidateFiles:   []string{"sample.txt"},
+			AddedLinesOnly:   true,
+			AddedLinesByFile: map[string]map[int]struct{}{},
+		},
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	result, err := Run(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Matches) != 0 {
+		t.Fatalf("expected 0 matches when file has no added lines, got %d", len(result.Matches))
+	}
+	if result.Stats.Matches != 0 {
+		t.Fatalf("expected stats.matches to be 0, got %d", result.Stats.Matches)
+	}
+	if result.Stats.FilesScanned != 1 {
+		t.Fatalf("expected filesScanned to remain 1, got %d", result.Stats.FilesScanned)
+	}
+}
+
+func TestRunAddedLinesOnlyIgnoredWhenGitModeOff(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFileWithContent(t, filepath.Join(root, "sample.txt"), "token=aaa\n")
+
+	request := Request{
+		Roots: []string{root},
+		Rules: []rules.Rule{
+			{
+				Message:  "Found $0",
+				Regex:    "token=[a-z]+",
+				Severity: "warning",
+				Paths:    []string{"**/*"},
+			},
+		},
+		Include: []string{"**/*"},
+		Git: &GitSelectionRequest{
+			Mode:           "off",
+			CandidateFiles: []string{"sample.txt"},
+			AddedLinesOnly: true,
+			AddedLinesByFile: map[string]map[int]struct{}{
+				"sample.txt": {},
+			},
+		},
+		MaxFileSizeBytes: 1024,
+		Concurrency:      1,
+	}
+
+	result, err := Run(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Matches) != 1 {
+		t.Fatalf("expected added-lines filter to be ignored in mode=off, got %d matches", len(result.Matches))
+	}
+}
+
 func TestRunRejectsEmptyRegex(t *testing.T) {
 	t.Parallel()
 
@@ -473,7 +594,7 @@ func TestScanEntriesCountsSkippedOnReadError(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, filesScanned, filesSkipped, err := scanEntries(entries, compiled, 1)
+	_, filesScanned, filesSkipped, err := scanEntries(entries, compiled, 1, false, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -662,7 +783,7 @@ func TestScanEntriesSkipsRuleWhenPathExcluded(t *testing.T) {
 	}
 
 	entries := []fileEntry{{root: root, relPath: "sample.txt"}}
-	result, _, _, err := scanEntries(entries, compiled, 1)
+	result, _, _, err := scanEntries(entries, compiled, 1, false, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -684,7 +805,7 @@ func TestScanEntriesErrorsOnInvalidRulePattern(t *testing.T) {
 		exclude: nil,
 	}}
 
-	_, filesScanned, filesSkipped, err := scanEntries(entries, compiled, 1)
+	_, filesScanned, filesSkipped, err := scanEntries(entries, compiled, 1, false, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid rule path pattern")
 	}
