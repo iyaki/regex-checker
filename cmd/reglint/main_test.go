@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -767,6 +768,163 @@ func TestRunAnalyzeBaselineCompareSARIFOutputRemainsANSIFreeAndSchemaStable(t *t
 	}
 }
 
+func TestRunAnalyzeGitModeOffDoesNotRequireGit(t *testing.T) {
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	t.Setenv("PATH", "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--format", "json",
+		"--git-mode", "off",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d with output %q", code, output.String())
+	}
+	got := decodeJSONResult(t, output.Bytes())
+	if len(got.Matches) != 1 {
+		t.Fatalf("expected 1 match with git-mode=off, got %d", len(got.Matches))
+	}
+}
+
+func TestRunAnalyzeGitModeStagedOutsideRepositoryReturnsError(t *testing.T) {
+	t.Parallel()
+	ensureGitAvailable(t)
+
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--git-mode", "staged",
+		rootDir,
+	}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(output.String(), "git mode staged requires a git repository") {
+		t.Fatalf("expected non-repo git error, got %q", output.String())
+	}
+}
+
+func TestRunAnalyzeGitModeStagedScansOnlyStagedFiles(t *testing.T) {
+	t.Parallel()
+	ensureGitAvailable(t)
+
+	repoDir := t.TempDir()
+	initGitRepo(t, repoDir)
+
+	writeFixture(t, repoDir, "staged.txt", "token=aaa\n")
+	writeFixture(t, repoDir, "unstaged.txt", "token=bbb\n")
+	runGit(t, repoDir, "add", "staged.txt")
+
+	configDir := t.TempDir()
+	configPath := writeRuleConfig(t, configDir, "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--format", "json",
+		"--git-mode", "staged",
+		repoDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d with output %q", code, output.String())
+	}
+
+	got := decodeJSONResult(t, output.Bytes())
+	if len(got.Matches) != 1 {
+		t.Fatalf("expected 1 match for staged-only scan, got %d", len(got.Matches))
+	}
+	if got.Matches[0].FilePath != "staged.txt" {
+		t.Fatalf("expected staged.txt match, got %q", got.Matches[0].FilePath)
+	}
+}
+
+func TestRunAnalyzeGitModeDiffScansOnlyChangedFiles(t *testing.T) {
+	t.Parallel()
+	ensureGitAvailable(t)
+
+	repoDir := t.TempDir()
+	initGitRepo(t, repoDir)
+
+	writeFixture(t, repoDir, "changed.txt", "clean\n")
+	writeFixture(t, repoDir, "unchanged.txt", "token=abc\n")
+	runGit(t, repoDir, "add", ".")
+	runGit(t, repoDir, "commit", "-m", "initial")
+
+	writeFixture(t, repoDir, "changed.txt", "token=xyz\n")
+
+	configDir := t.TempDir()
+	configPath := writeRuleConfig(t, configDir, "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--format", "json",
+		"--git-mode", "diff",
+		"--git-diff", "HEAD",
+		repoDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d with output %q", code, output.String())
+	}
+
+	got := decodeJSONResult(t, output.Bytes())
+	if len(got.Matches) != 1 {
+		t.Fatalf("expected 1 match for diff-only scan, got %d", len(got.Matches))
+	}
+	if got.Matches[0].FilePath != "changed.txt" {
+		t.Fatalf("expected changed.txt match, got %q", got.Matches[0].FilePath)
+	}
+}
+
+func TestRunAnalyzeGitModeDiffInvalidTargetReturnsError(t *testing.T) {
+	t.Parallel()
+	ensureGitAvailable(t)
+
+	repoDir := t.TempDir()
+	initGitRepo(t, repoDir)
+	writeFixture(t, repoDir, "sample.txt", "token=abc\n")
+	runGit(t, repoDir, "add", "sample.txt")
+	runGit(t, repoDir, "commit", "-m", "initial")
+
+	configDir := t.TempDir()
+	configPath := writeRuleConfig(t, configDir, "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--git-mode", "diff",
+		"--git-diff", "DOES_NOT_EXIST",
+		repoDir,
+	}, &output)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(output.String(), "git mode diff failed to resolve changed files for target \"DOES_NOT_EXIST\"") {
+		t.Fatalf("expected invalid diff target error, got %q", output.String())
+	}
+}
+
 func TestRunUsesProvidedOutputWriter(t *testing.T) {
 	t.Parallel()
 
@@ -930,6 +1088,35 @@ func writeRuleConfigWithPreamble(t *testing.T, dir, preamble string) string {
 	}
 
 	return path
+}
+
+func ensureGitAvailable(t *testing.T) {
+	t.Helper()
+
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is required for this test")
+	}
+}
+
+func initGitRepo(t *testing.T, dir string) {
+	t.Helper()
+
+	runGit(t, dir, "init")
+	runGit(t, dir, "config", "user.name", "RegLint Test")
+	runGit(t, dir, "config", "user.email", "reglint-test@example.com")
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v; output: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+
+	return string(output)
 }
 
 func assertSingleErrorMessage(t *testing.T, got string) {
