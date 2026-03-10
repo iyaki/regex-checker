@@ -13,6 +13,7 @@ import (
 	"github.com/iyaki/reglint/internal/baseline"
 	"github.com/iyaki/reglint/internal/config"
 	"github.com/iyaki/reglint/internal/git"
+	"github.com/iyaki/reglint/internal/hooks"
 	"github.com/iyaki/reglint/internal/output"
 	"github.com/iyaki/reglint/internal/rules"
 	"github.com/iyaki/reglint/internal/scan"
@@ -418,11 +419,29 @@ func runAnalyze(
 	}
 
 	request, failOn, consoleColorSettings := BuildScanRequest(cfg, ruleSet)
-	if err := runGitCapabilityChecks(cfg, request); err != nil {
+	hookRegistry, hookContext := buildScanHooks(cfg, request)
+	if err := hookRegistry.OnCapabilitiesCheck(hookContext); err != nil {
 		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
 
+	scope, err := hookRegistry.BeforeCollectCandidates(hookContext)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
+	}
+	applyCandidateScope(&request, &hookContext, scope)
+
+	ignoreAugmentation, err := hookRegistry.BeforeIgnoreEvaluation(hookContext)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
+	}
+	applyIgnoreAugmentation(&request, ignoreAugmentation)
+
 	result, err := scan.Run(request)
+	if err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
+	}
+
+	result, err = applyAfterMatchHooks(result, hookRegistry, hookContext)
 	if err != nil {
 		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
 	}
@@ -532,14 +551,117 @@ func buildGitRequest(settings rules.GitSettings) *scan.GitSelectionRequest {
 
 var checkGitCapabilities = git.CheckCapabilities
 
-func runGitCapabilityChecks(cfg Config, request scan.Request) error {
+var selectGitCandidateFiles = git.SelectCandidateFiles
+
+var selectGitAddedLines = git.SelectAddedLines
+
+func buildScanHooks(cfg Config, request scan.Request) (hooks.Registry, hooks.RunContext) {
 	if request.Git == nil {
+		return hooks.NewRegistry(), hooks.RunContext{}
+	}
+
+	context := hooks.RunContext{
+		Mode:             request.Git.Mode,
+		DiffTarget:       request.Git.DiffTarget,
+		WorkingDir:       resolveGitWorkingDir(cfg.Roots),
+		AddedLinesOnly:   request.Git.AddedLinesOnly,
+		GitignoreEnabled: request.Git.GitignoreEnabled,
+	}
+	provider := git.NewHookProvider(checkGitCapabilities, selectGitCandidateFiles, selectGitAddedLines)
+
+	return hooks.NewRegistry(provider), context
+}
+
+func applyCandidateScope(request *scan.Request, context *hooks.RunContext, scope hooks.CandidateScope) {
+	if request.Git == nil {
+		return
+	}
+
+	if len(scope.CandidateFiles) > 0 {
+		request.Git.CandidateFiles = append([]string{}, scope.CandidateFiles...)
+	}
+
+	request.Git.AddedLinesByFile = cloneAddedLinesByFile(scope.AddedLinesByFile)
+	context.AddedLinesByFile = request.Git.AddedLinesByFile
+}
+
+func applyIgnoreAugmentation(request *scan.Request, augmentation hooks.IgnoreAugmentation) {
+	if len(augmentation.Files) == 0 {
+		return
+	}
+
+	request.Ignore.Files = mergeIgnoreFiles(augmentation.Files, request.Ignore.Files)
+}
+
+func mergeIgnoreFiles(primary []string, secondary []string) []string {
+	seen := make(map[string]struct{}, len(primary)+len(secondary))
+	merged := make([]string, 0, len(primary)+len(secondary))
+
+	appendUnique := func(values []string) {
+		for _, value := range values {
+			if value == "" {
+				continue
+			}
+			if _, exists := seen[value]; exists {
+				continue
+			}
+
+			seen[value] = struct{}{}
+			merged = append(merged, value)
+		}
+	}
+
+	appendUnique(primary)
+	appendUnique(secondary)
+
+	return merged
+}
+
+func cloneAddedLinesByFile(source map[string]map[int]struct{}) map[string]map[int]struct{} {
+	if len(source) == 0 {
 		return nil
 	}
 
-	workingDir := resolveGitWorkingDir(cfg.Roots)
+	cloned := make(map[string]map[int]struct{}, len(source))
+	for filePath, lineSet := range source {
+		if len(lineSet) == 0 {
+			continue
+		}
 
-	return checkGitCapabilities(git.CapabilityRequest{Mode: request.Git.Mode, WorkingDir: workingDir})
+		copiedLineSet := make(map[int]struct{}, len(lineSet))
+		for line := range lineSet {
+			copiedLineSet[line] = struct{}{}
+		}
+		cloned[filePath] = copiedLineSet
+	}
+
+	if len(cloned) == 0 {
+		return nil
+	}
+
+	return cloned
+}
+
+func applyAfterMatchHooks(result scan.Result, registry hooks.Registry, context hooks.RunContext) (scan.Result, error) {
+	if len(result.Matches) == 0 {
+		return result, nil
+	}
+
+	filtered := make([]scan.Match, 0, len(result.Matches))
+	for _, match := range result.Matches {
+		keep, err := registry.AfterMatch(context, hooks.MatchContext{FilePath: match.FilePath, Line: match.Line})
+		if err != nil {
+			return scan.Result{}, err
+		}
+		if keep {
+			filtered = append(filtered, match)
+		}
+	}
+
+	result.Matches = filtered
+	result.Stats.Matches = len(result.Matches)
+
+	return result, nil
 }
 
 func resolveGitWorkingDir(roots []string) string {

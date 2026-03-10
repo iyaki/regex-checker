@@ -500,6 +500,185 @@ func TestRunAnalyzeSkipsGitCapabilitiesWhenModeOff(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeRunsGitSelectionHooksWhenModeEnabled(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	restoreCapabilities := setCheckGitCapabilitiesHook(t, func(git.CapabilityRequest) error {
+		return nil
+	})
+	t.Cleanup(restoreCapabilities)
+
+	candidateCalls := 0
+	addedLineCalls := 0
+	restoreCandidates := setSelectGitCandidateFilesHook(t, func(request git.CandidateSelectionRequest) ([]string, error) {
+		candidateCalls++
+		if request.Mode != "staged" {
+			t.Fatalf("expected mode staged, got %q", request.Mode)
+		}
+		if request.WorkingDir != rootDir {
+			t.Fatalf("expected working dir %q, got %q", rootDir, request.WorkingDir)
+		}
+
+		return []string{"sample.txt"}, nil
+	})
+	t.Cleanup(restoreCandidates)
+	restoreAddedLines := setSelectGitAddedLinesHook(
+		t,
+		func(git.CandidateSelectionRequest) (map[string]map[int]struct{}, error) {
+			addedLineCalls++
+
+			return nil, nil
+		},
+	)
+	t.Cleanup(restoreAddedLines)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--git-mode", "staged",
+		rootDir,
+	})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if candidateCalls != 1 {
+		t.Fatalf("expected one candidate selection call, got %d", candidateCalls)
+	}
+	if addedLineCalls != 0 {
+		t.Fatalf("expected zero added-line calls, got %d", addedLineCalls)
+	}
+}
+
+func TestRunAnalyzeSkipsGitSelectionHooksWhenModeOff(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	restoreCandidates := setSelectGitCandidateFilesHook(t, func(git.CandidateSelectionRequest) ([]string, error) {
+		t.Fatal("expected candidate selection hook not to run")
+
+		return nil, nil
+	})
+	t.Cleanup(restoreCandidates)
+	restoreAddedLines := setSelectGitAddedLinesHook(
+		t,
+		func(git.CandidateSelectionRequest) (map[string]map[int]struct{}, error) {
+			t.Fatal("expected added-lines hook not to run")
+
+			return nil, nil
+		},
+	)
+	t.Cleanup(restoreAddedLines)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{"--config", configPath, rootDir})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestRunAnalyzeReturnsSelectionHookErrorWhenGitEnabled(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	restoreCapabilities := setCheckGitCapabilitiesHook(t, func(git.CapabilityRequest) error {
+		return nil
+	})
+	t.Cleanup(restoreCapabilities)
+
+	restoreCandidates := setSelectGitCandidateFilesHook(t, func(git.CandidateSelectionRequest) ([]string, error) {
+		return nil, errors.New("candidate hook failed")
+	})
+	t.Cleanup(restoreCandidates)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--git-mode", "staged",
+		rootDir,
+	})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "candidate hook failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunAnalyzeFiltersMatchesByAddedLinesHook(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "token=aaa\ntoken=bbb\n")
+	configPath := writeConfig(t, sampleConfig())
+
+	restoreCapabilities := setCheckGitCapabilitiesHook(t, func(git.CapabilityRequest) error {
+		return nil
+	})
+	t.Cleanup(restoreCapabilities)
+
+	restoreCandidates := setSelectGitCandidateFilesHook(t, func(git.CandidateSelectionRequest) ([]string, error) {
+		return []string{"sample.txt"}, nil
+	})
+	t.Cleanup(restoreCandidates)
+	restoreAddedLines := setSelectGitAddedLinesHook(
+		t,
+		func(git.CandidateSelectionRequest) (map[string]map[int]struct{}, error) {
+			return map[string]map[int]struct{}{"sample.txt": {2: {}}}, nil
+		},
+	)
+	t.Cleanup(restoreAddedLines)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--git-mode", "staged",
+		"--git-added-lines-only",
+		rootDir,
+	})
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Matches) != 1 {
+		t.Fatalf("expected one match after added-lines filtering, got %d", len(result.Matches))
+	}
+	if result.Matches[0].Line != 2 {
+		t.Fatalf("expected remaining match on line 2, got %d", result.Matches[0].Line)
+	}
+}
+
 func TestSeverityRankUnknown(t *testing.T) {
 	t.Parallel()
 
@@ -597,5 +776,33 @@ func setCheckGitCapabilitiesHook(t *testing.T, hook func(git.CapabilityRequest) 
 
 	return func() {
 		checkGitCapabilities = original
+	}
+}
+
+func setSelectGitCandidateFilesHook(
+	t *testing.T,
+	hook func(git.CandidateSelectionRequest) ([]string, error),
+) func() {
+	t.Helper()
+
+	original := selectGitCandidateFiles
+	selectGitCandidateFiles = hook
+
+	return func() {
+		selectGitCandidateFiles = original
+	}
+}
+
+func setSelectGitAddedLinesHook(
+	t *testing.T,
+	hook func(git.CandidateSelectionRequest) (map[string]map[int]struct{}, error),
+) func() {
+	t.Helper()
+
+	original := selectGitAddedLines
+	selectGitAddedLines = hook
+
+	return func() {
+		selectGitAddedLines = original
 	}
 }

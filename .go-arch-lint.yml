@@ -28,6 +28,9 @@ components:
   git:
     in:
       - internal/git/**
+  hooks:
+    in:
+      - internal/hooks/**
   io:
     in:
       - internal/io/**
@@ -59,6 +62,9 @@ deps:
     anyProjectDeps: true
     anyVendorDeps: true
   git:
+    anyProjectDeps: true
+    anyVendorDeps: false
+  hooks:
     anyProjectDeps: true
     anyVendorDeps: false
   output:
