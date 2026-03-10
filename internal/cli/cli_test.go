@@ -192,5 +192,9 @@ func expectedAnalyzeHelpOutput() string {
 		"      --fail-on string (default none)  Fail if matches at or above severity.\n" +
 		"      --baseline string (default none)  Baseline JSON path for suppression.\n" +
 		"      --write-baseline bool (default false)  Generate/regenerate baseline from findings.\n" +
+		"      --git-mode string (default off)  Select Git mode: off, staged, or diff.\n" +
+		"      --git-diff string (default none)  Diff target/range for --git-mode=diff.\n" +
+		"      --git-added-lines-only bool (default false)  Restrict matches to added lines in Git mode.\n" +
+		"      --no-gitignore bool (default false)  Disable .gitignore filtering for this run.\n" +
 		"      --no-ignore-files bool (default false)  Disable ignore file loading and matching.\n"
 }

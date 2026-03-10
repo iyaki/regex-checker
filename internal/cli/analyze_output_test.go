@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/iyaki/reglint/internal/config"
 	"github.com/iyaki/reglint/internal/output"
 	"github.com/iyaki/reglint/internal/rules"
 	"github.com/iyaki/reglint/internal/scan"
@@ -398,6 +399,128 @@ func TestRunAnalyzeWriteBaselineRequiresEffectiveBaselinePath(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--write-baseline requires an effective baseline path") {
 		t.Fatalf("expected write-baseline path error, got %v", err)
+	}
+}
+
+func TestPrepareAnalyzeConfigUsesRuleSetGitSettings(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{ConfigPath: writeConfig(t, sampleConfig())}
+	ruleSet := config.RuleSet{
+		Git: &config.GitSettings{
+			Mode:             stringPtr("staged"),
+			AddedLinesOnly:   boolPtr(true),
+			GitignoreEnabled: boolPtr(true),
+		},
+	}
+
+	prepared, err := prepareAnalyzeConfig(cfg, ruleSet)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if prepared.GitMode != "staged" {
+		t.Fatalf("expected git mode staged, got %q", prepared.GitMode)
+	}
+	if !prepared.GitAddedLinesOnly {
+		t.Fatal("expected added-lines-only true")
+	}
+	if !prepared.GitignoreEnabled {
+		t.Fatal("expected gitignore enabled")
+	}
+}
+
+func TestPrepareAnalyzeConfigCLIOverridesRuleSetGitSettings(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ConfigPath:           writeConfig(t, sampleConfig()),
+		GitMode:              "staged",
+		GitModeSet:           true,
+		GitAddedLinesOnly:    true,
+		GitAddedLinesOnlySet: true,
+		NoGitignore:          true,
+	}
+	ruleSet := config.RuleSet{
+		Git: &config.GitSettings{
+			Mode:             stringPtr("off"),
+			AddedLinesOnly:   boolPtr(false),
+			GitignoreEnabled: boolPtr(true),
+		},
+	}
+
+	prepared, err := prepareAnalyzeConfig(cfg, ruleSet)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if prepared.GitMode != "staged" {
+		t.Fatalf("expected git mode staged, got %q", prepared.GitMode)
+	}
+	if !prepared.GitAddedLinesOnly {
+		t.Fatal("expected added-lines-only true from CLI")
+	}
+	if prepared.GitignoreEnabled {
+		t.Fatal("expected gitignore disabled from CLI")
+	}
+}
+
+func TestPrepareAnalyzeConfigGitDiffForcesDiffMode(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ConfigPath:    writeConfig(t, sampleConfig()),
+		GitMode:       "staged",
+		GitModeSet:    true,
+		GitDiffTarget: "HEAD~1..HEAD",
+		GitDiffSet:    true,
+	}
+
+	prepared, err := prepareAnalyzeConfig(cfg, config.RuleSet{})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if prepared.GitMode != "diff" {
+		t.Fatalf("expected git mode diff, got %q", prepared.GitMode)
+	}
+	if prepared.GitDiffTarget != "HEAD~1..HEAD" {
+		t.Fatalf("expected git diff target HEAD~1..HEAD, got %q", prepared.GitDiffTarget)
+	}
+}
+
+func TestPrepareAnalyzeConfigRejectsDiffModeWithoutDiffTarget(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ConfigPath: writeConfig(t, sampleConfig()),
+		GitMode:    "diff",
+		GitModeSet: true,
+	}
+
+	_, err := prepareAnalyzeConfig(cfg, config.RuleSet{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "effective --git-mode=diff requires --git-diff") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPrepareAnalyzeConfigRejectsAddedLinesOnlyWithOffMode(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ConfigPath:           writeConfig(t, sampleConfig()),
+		GitMode:              "off",
+		GitModeSet:           true,
+		GitAddedLinesOnly:    true,
+		GitAddedLinesOnlySet: true,
+	}
+
+	_, err := prepareAnalyzeConfig(cfg, config.RuleSet{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--git-added-lines-only is valid only when --git-mode=staged|diff") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -918,4 +1041,12 @@ func assertFilesScannedNonNegative(t *testing.T, filesScanned int) {
 	if filesScanned < 0 {
 		t.Fatalf("unexpected files scanned: %d", filesScanned)
 	}
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }

@@ -10,8 +10,19 @@ type Request struct {
 	Include          []string
 	Exclude          []string
 	Ignore           IgnoreSettings
+	Git              *GitSelectionRequest
 	MaxFileSizeBytes int64
 	Concurrency      int
+}
+
+// GitSelectionRequest defines optional Git selection constraints for a scan.
+type GitSelectionRequest struct {
+	Mode             string
+	DiffTarget       string
+	CandidateFiles   []string
+	AddedLinesByFile map[string]map[int]struct{}
+	AddedLinesOnly   bool
+	GitignoreEnabled bool
 }
 
 // IgnoreSettings defines ignore file behavior for a scan.

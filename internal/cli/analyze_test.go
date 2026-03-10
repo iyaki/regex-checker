@@ -198,6 +198,85 @@ func TestParseAnalyzeBaselineFlags(t *testing.T) {
 	}
 }
 
+func TestParseAnalyzeGitDefaults(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+
+	got, err := cli.ParseAnalyzeArgs([]string{"--config", configPath})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if got.GitMode != "off" {
+		t.Fatalf("expected default git mode off, got %q", got.GitMode)
+	}
+	if got.GitDiffTarget != "" {
+		t.Fatalf("expected empty git diff target, got %q", got.GitDiffTarget)
+	}
+	if got.GitAddedLinesOnly {
+		t.Fatal("expected git-added-lines-only to be false")
+	}
+	if !got.GitignoreEnabled {
+		t.Fatal("expected gitignore to be enabled by default")
+	}
+}
+
+func TestParseAnalyzeGitFlags(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+
+	got, err := cli.ParseAnalyzeArgs([]string{
+		"--config", configPath,
+		"--git-mode", "diff",
+		"--git-diff", "HEAD~1..HEAD",
+		"--git-added-lines-only",
+		"--no-gitignore",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if got.GitMode != "diff" {
+		t.Fatalf("expected git mode diff, got %q", got.GitMode)
+	}
+	if got.GitDiffTarget != "HEAD~1..HEAD" {
+		t.Fatalf("expected git diff target HEAD~1..HEAD, got %q", got.GitDiffTarget)
+	}
+	if !got.GitAddedLinesOnly {
+		t.Fatal("expected git-added-lines-only to be true")
+	}
+	if got.GitignoreEnabled {
+		t.Fatal("expected gitignore to be disabled")
+	}
+}
+
+func TestParseAnalyzeRejectsInvalidGitMode(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+
+	_, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--git-mode", "bogus"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestParseAnalyzeGitDiffImpliesDiffMode(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTempConfig(t)
+
+	got, err := cli.ParseAnalyzeArgs([]string{"--config", configPath, "--git-diff", "HEAD~1..HEAD"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.GitMode != "diff" {
+		t.Fatalf("expected git mode diff, got %q", got.GitMode)
+	}
+}
+
 func TestParseAnalyzeRequiresOutPathForMultiFormat(t *testing.T) {
 	t.Parallel()
 

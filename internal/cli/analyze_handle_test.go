@@ -382,6 +382,46 @@ func TestHandleAnalyzeReturnsErrorWhenFormatsInvalid(t *testing.T) {
 	}
 }
 
+func TestHandleAnalyzeRejectsGitModeDiffWithoutGitDiff(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	configPath := writeConfig(t, sampleConfig())
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		"--git-mode", "diff",
+	}, &output)
+
+	if code != exitCodeError {
+		t.Fatalf("expected exit code %d, got %d", exitCodeError, code)
+	}
+	if !strings.Contains(output.String(), "effective --git-mode=diff requires --git-diff") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestHandleAnalyzeRejectsGitAddedLinesOnlyWithGitModeOff(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	configPath := writeConfig(t, sampleConfig())
+
+	var output bytes.Buffer
+	code := HandleAnalyze([]string{
+		"--config", configPath,
+		"--git-added-lines-only",
+	}, &output)
+
+	if code != exitCodeError {
+		t.Fatalf("expected exit code %d, got %d", exitCodeError, code)
+	}
+	if !strings.Contains(output.String(), "--git-added-lines-only is valid only when --git-mode=staged|diff") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
 func TestSeverityRankUnknown(t *testing.T) {
 	t.Parallel()
 

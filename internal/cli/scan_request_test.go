@@ -227,6 +227,131 @@ func TestBuildScanRequestEmptyNoColorDoesNotOverrideRuleSet(t *testing.T) {
 	}
 }
 
+func TestBuildScanRequestUsesRuleSetGitSettingsWithoutCLIOverrides(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Git: &config.GitSettings{
+			Mode:             stringPtr("staged"),
+			AddedLinesOnly:   boolPtr(true),
+			GitignoreEnabled: boolPtr(true),
+		},
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Git == nil {
+		t.Fatal("expected git request to be set")
+	}
+	if request.Git.Mode != "staged" {
+		t.Fatalf("expected git mode staged, got %q", request.Git.Mode)
+	}
+	if !request.Git.AddedLinesOnly {
+		t.Fatal("expected added-lines-only true")
+	}
+	if !request.Git.GitignoreEnabled {
+		t.Fatal("expected gitignore enabled")
+	}
+}
+
+func TestBuildScanRequestCLIOverridesRuleSetGitSettings(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Git: &config.GitSettings{
+			Mode:             stringPtr("off"),
+			Diff:             stringPtr("HEAD~2..HEAD~1"),
+			AddedLinesOnly:   boolPtr(false),
+			GitignoreEnabled: boolPtr(true),
+		},
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:                []string{"./root"},
+		Concurrency:          1,
+		MaxFileSizeBytes:     10,
+		GitMode:              "staged",
+		GitModeSet:           true,
+		GitAddedLinesOnly:    true,
+		GitAddedLinesOnlySet: true,
+		NoGitignore:          true,
+	}
+
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Git == nil {
+		t.Fatal("expected git request to be set")
+	}
+	if request.Git.Mode != "staged" {
+		t.Fatalf("expected git mode staged, got %q", request.Git.Mode)
+	}
+	if request.Git.DiffTarget != "" {
+		t.Fatalf("expected empty diff target for non-diff mode, got %q", request.Git.DiffTarget)
+	}
+	if !request.Git.AddedLinesOnly {
+		t.Fatal("expected added-lines-only true")
+	}
+	if request.Git.GitignoreEnabled {
+		t.Fatal("expected gitignore disabled by CLI")
+	}
+}
+
+func TestBuildScanRequestGitDiffForcesDiffMode(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Git:   &config.GitSettings{Mode: stringPtr("staged")},
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+		GitMode:          "off",
+		GitModeSet:       true,
+		GitDiffTarget:    "HEAD~1..HEAD",
+		GitDiffSet:       true,
+	}
+
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Git == nil {
+		t.Fatal("expected git request to be set")
+	}
+	if request.Git.Mode != "diff" {
+		t.Fatalf("expected diff mode, got %q", request.Git.Mode)
+	}
+	if request.Git.DiffTarget != "HEAD~1..HEAD" {
+		t.Fatalf("expected diff target HEAD~1..HEAD, got %q", request.Git.DiffTarget)
+	}
+}
+
+func TestBuildScanRequestGitModeOffReturnsNilGitRequest(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Git:   &config.GitSettings{Mode: stringPtr("off")},
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Git != nil {
+		t.Fatal("expected nil git request in off mode")
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
 }

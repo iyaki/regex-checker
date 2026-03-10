@@ -46,6 +46,14 @@ type Config struct {
 	RuleSetBaselinePath   string
 	EffectiveBaselinePath string
 	WriteBaseline         bool
+	GitMode               string
+	GitModeSet            bool
+	GitDiffTarget         string
+	GitDiffSet            bool
+	GitAddedLinesOnly     bool
+	GitAddedLinesOnlySet  bool
+	GitignoreEnabled      bool
+	NoGitignore           bool
 	NoIgnoreFiles         bool
 }
 
@@ -105,6 +113,10 @@ func ParseAnalyzeArgs(args []string) (Config, error) {
 	flagSet.StringVar(&cfg.FailOnSeverity, "fail-on", "", "Fail if matches at or above severity.")
 	flagSet.StringVar(&cfg.BaselinePath, "baseline", "", "Baseline JSON path for suppression.")
 	flagSet.BoolVar(&cfg.WriteBaseline, "write-baseline", false, "Generate/regenerate baseline from findings.")
+	flagSet.StringVar(&cfg.GitMode, "git-mode", "off", "Select Git mode: off, staged, or diff.")
+	flagSet.StringVar(&cfg.GitDiffTarget, "git-diff", "", "Diff target/range for git mode diff.")
+	flagSet.BoolVar(&cfg.GitAddedLinesOnly, "git-added-lines-only", false, "Restrict matches to added lines in Git mode.")
+	flagSet.BoolVar(&cfg.NoGitignore, "no-gitignore", false, "Disable .gitignore filtering for this run.")
 	flagSet.BoolVar(&cfg.NoIgnoreFiles, "no-ignore-files", false, "Disable ignore file loading and matching.")
 
 	if err := flagSet.Parse(args); err != nil {
@@ -113,20 +125,12 @@ func ParseAnalyzeArgs(args []string) (Config, error) {
 
 	cfg.Include = include
 	cfg.Exclude = exclude
-	if wasFlagProvided(flagSet, "concurrency") {
-		cfg.ConcurrencySet = true
-	}
+	cfg.GitMode = strings.TrimSpace(cfg.GitMode)
+	cfg.GitDiffTarget = strings.TrimSpace(cfg.GitDiffTarget)
+	applyAnalyzeFlagPresence(flagSet, &cfg)
+	cfg.Roots = resolveAnalyzeRoots(flagSet.Args())
 
-	if flagSet.NArg() == 0 {
-		cfg.Roots = []string{"."}
-	} else {
-		cfg.Roots = append([]string{}, flagSet.Args()...)
-	}
-
-	formatInput := *formatValue
-	if wasFlagProvided(flagSet, "f") && !wasFlagProvided(flagSet, "format") {
-		formatInput = *formatShort
-	}
+	formatInput := selectFormatInput(flagSet, *formatValue, *formatShort)
 	formats, err := parseFormats(formatInput)
 	if err != nil {
 		return Config{}, err
@@ -138,6 +142,33 @@ func ParseAnalyzeArgs(args []string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func applyAnalyzeFlagPresence(flagSet *flag.FlagSet, cfg *Config) {
+	cfg.ConcurrencySet = wasFlagProvided(flagSet, "concurrency")
+	cfg.GitModeSet = wasFlagProvided(flagSet, "git-mode")
+	cfg.GitDiffSet = wasFlagProvided(flagSet, "git-diff")
+	cfg.GitAddedLinesOnlySet = wasFlagProvided(flagSet, "git-added-lines-only")
+	cfg.GitignoreEnabled = !cfg.NoGitignore
+	if cfg.GitDiffSet {
+		cfg.GitMode = "diff"
+	}
+}
+
+func resolveAnalyzeRoots(args []string) []string {
+	if len(args) == 0 {
+		return []string{"."}
+	}
+
+	return append([]string{}, args...)
+}
+
+func selectFormatInput(flagSet *flag.FlagSet, longValue string, shortValue string) string {
+	if wasFlagProvided(flagSet, "f") && !wasFlagProvided(flagSet, "format") {
+		return shortValue
+	}
+
+	return longValue
 }
 
 func parseFormats(value string) ([]string, error) {
@@ -191,8 +222,31 @@ func validateAnalyzeConfig(cfg Config) error {
 	if err := validateOutputPaths(cfg); err != nil {
 		return err
 	}
+	if err := validateGitCLIInputs(cfg); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func validateGitCLIInputs(cfg Config) error {
+	if !isValidGitMode(cfg.GitMode) {
+		return errors.New("--git-mode must be one of off, staged, diff")
+	}
+	if cfg.GitDiffSet && cfg.GitDiffTarget == "" {
+		return errors.New("--git-diff must be a non-empty string")
+	}
+
+	return nil
+}
+
+func isValidGitMode(mode string) bool {
+	switch mode {
+	case "off", "staged", "diff":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateConfigPath(path string) error {
@@ -321,12 +375,18 @@ func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string,
 	ignoreSettings := resolveIgnoreSettings(effective)
 	consoleColorSettings := resolveConsoleColorSettings(effective)
 
+	resolvedGit := effective.Git
+	if settings, err := resolveEffectiveGitSettings(cfg, effective.Git); err == nil {
+		resolvedGit = settings
+	}
+
 	request := scan.Request{
 		Roots:            append([]string{}, cfg.Roots...),
 		Rules:            buildEffectiveRules(cfg, effective),
 		Include:          append([]string{}, effective.Include...),
 		Exclude:          append([]string{}, effective.Exclude...),
 		Ignore:           ignoreSettings,
+		Git:              buildGitRequest(resolvedGit),
 		MaxFileSizeBytes: cfg.MaxFileSizeBytes,
 		Concurrency:      resolveConcurrency(cfg, effective.Concurrency),
 	}
@@ -384,7 +444,85 @@ func prepareAnalyzeConfig(cfg Config, ruleSet config.RuleSet) (Config, error) {
 		return Config{}, errors.New("--write-baseline requires an effective baseline path")
 	}
 
+	resolvedGit, err := resolveEffectiveGitSettings(cfg, ruleSet.ToRules().Git)
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.GitMode = resolvedGit.Mode
+	cfg.GitDiffTarget = resolvedGit.Diff
+	cfg.GitAddedLinesOnly = resolvedGit.AddedLinesOnly
+	cfg.GitignoreEnabled = resolvedGit.GitignoreEnabled
+
 	return cfg, nil
+}
+
+func resolveEffectiveGitSettings(cfg Config, fromRuleSet rules.GitSettings) (rules.GitSettings, error) {
+	resolved := defaultEffectiveGitSettings(fromRuleSet)
+	applyGitCLIOverrides(cfg, &resolved)
+
+	return resolved, validateEffectiveGitSettings(resolved)
+}
+
+func defaultEffectiveGitSettings(fromRuleSet rules.GitSettings) rules.GitSettings {
+	resolved := rules.GitSettings{
+		Mode:             fromRuleSet.Mode,
+		Diff:             strings.TrimSpace(fromRuleSet.Diff),
+		AddedLinesOnly:   fromRuleSet.AddedLinesOnly,
+		GitignoreEnabled: fromRuleSet.GitignoreEnabled,
+	}
+	if resolved.Mode == "" {
+		resolved.Mode = "off"
+	}
+
+	return resolved
+}
+
+func applyGitCLIOverrides(cfg Config, resolved *rules.GitSettings) {
+	if cfg.GitModeSet {
+		resolved.Mode = cfg.GitMode
+	}
+	if cfg.GitDiffSet {
+		resolved.Mode = "diff"
+		resolved.Diff = cfg.GitDiffTarget
+	}
+	if cfg.GitAddedLinesOnlySet {
+		resolved.AddedLinesOnly = cfg.GitAddedLinesOnly
+	}
+	if cfg.NoGitignore {
+		resolved.GitignoreEnabled = false
+	}
+	if resolved.Mode != "diff" {
+		resolved.Diff = ""
+	}
+}
+
+func validateEffectiveGitSettings(resolved rules.GitSettings) error {
+	if !isValidGitMode(resolved.Mode) {
+		return errors.New("--git-mode must be one of off, staged, diff")
+	}
+	if resolved.Mode == "diff" && resolved.Diff == "" {
+		return errors.New("effective --git-mode=diff requires --git-diff")
+	}
+	if resolved.AddedLinesOnly && resolved.Mode == "off" {
+		return errors.New("--git-added-lines-only is valid only when --git-mode=staged|diff")
+	}
+
+	return nil
+}
+
+func buildGitRequest(settings rules.GitSettings) *scan.GitSelectionRequest {
+	mode := strings.TrimSpace(settings.Mode)
+	if mode == "" || mode == "off" {
+		return nil
+	}
+
+	return &scan.GitSelectionRequest{
+		Mode:             mode,
+		DiffTarget:       strings.TrimSpace(settings.Diff),
+		AddedLinesOnly:   settings.AddedLinesOnly,
+		GitignoreEnabled: settings.GitignoreEnabled,
+	}
 }
 
 func applyBaselineMode(cfg Config, result scan.Result, failOn string) (scan.Result, string, error) {

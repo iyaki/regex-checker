@@ -112,6 +112,7 @@ func analyzeHelpFlags() []HelpFlag {
 	flags = append(flags, analyzeHelpOutputFlags()...)
 	flags = append(flags, analyzeHelpFilterFlags()...)
 	flags = append(flags, analyzeHelpRuntimeFlags()...)
+	flags = append(flags, analyzeHelpGitFlags()...)
 	flags = append(flags, analyzeHelpIgnoreFlags()...)
 
 	return flags
@@ -202,6 +203,35 @@ func analyzeHelpRuntimeFlags() []HelpFlag {
 			Type:        "bool",
 			Default:     "false",
 			Description: "Generate/regenerate baseline from findings.",
+		},
+	}
+}
+
+func analyzeHelpGitFlags() []HelpFlag {
+	return []HelpFlag{
+		{
+			Long:        "--git-mode",
+			Type:        "string",
+			Default:     "off",
+			Description: "Select Git mode: off, staged, or diff.",
+		},
+		{
+			Long:        "--git-diff",
+			Type:        "string",
+			Default:     "none",
+			Description: "Diff target/range for --git-mode=diff.",
+		},
+		{
+			Long:        "--git-added-lines-only",
+			Type:        "bool",
+			Default:     "false",
+			Description: "Restrict matches to added lines in Git mode.",
+		},
+		{
+			Long:        "--no-gitignore",
+			Type:        "bool",
+			Default:     "false",
+			Description: "Disable .gitignore filtering for this run.",
 		},
 	}
 }
