@@ -239,6 +239,25 @@ func e2ETierOrder(tier string) int {
 	}
 }
 
+func newE2ESmoke001Scenario(moduleRoot string) e2EScenario {
+	fixturePath := filepath.Join(moduleRoot, "testdata", "fixtures")
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "example.yaml")
+
+	return e2EScenario{
+		ID:           "E2E-SMOKE-001",
+		Tier:         "smoke",
+		Name:         "analyze happy path deterministic summary",
+		Fixture:      fixturePath,
+		Command:      []string{"analyze", "--config", configPath, "."},
+		ExpectedExit: 0,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionStdoutContains, Value: "Found token token=abc"},
+			{Type: e2EAssertionStdoutContains, Value: "sample.txt:1"},
+			{Type: e2EAssertionStdoutRegex, Value: `(?m)^Summary: files=1 skipped=0 matches=1 durationMs=[0-9]+$`},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)

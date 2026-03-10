@@ -201,3 +201,16 @@ func TestE2EHarnessScenarioOrderingByTierThenID(t *testing.T) {
 		t.Fatalf("expected sort helper to avoid mutating caller slice, got first input id %s", input[0].ID)
 	}
 }
+
+func TestE2ESmoke001AnalyzeHappyPathDeterministicSummary(t *testing.T) {
+	harness := newE2EHarness(t)
+
+	moduleRoot, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("resolve module root: %v", err)
+	}
+
+	scenario := newE2ESmoke001Scenario(moduleRoot)
+	result := harness.mustRunScenario(t, scenario)
+	harness.assertScenarioStderrEmpty(t, scenario, result)
+}
