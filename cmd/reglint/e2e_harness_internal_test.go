@@ -376,6 +376,42 @@ func newE2EFull001Scenario(moduleRoot string) e2EScenario {
 	}
 }
 
+func newE2EFull002Scenario(moduleRoot, baselinePath string) e2EScenario {
+	fixturePath := moduleRoot
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "fail.yaml")
+	scanPath := filepath.Join("testdata", "fixtures")
+
+	return e2EScenario{
+		ID:      "E2E-FULL-002",
+		Tier:    "full",
+		Name:    "baseline generation overwrites target and exits zero",
+		Fixture: fixturePath,
+		Command: []string{
+			"analyze",
+			"--config", configPath,
+			"--baseline", baselinePath,
+			"--write-baseline",
+			"--format", "json",
+			scanPath,
+		},
+		ExpectedExit: 0,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionFileExists, Path: baselinePath},
+			{Type: e2EAssertionJSONFieldEquals, Field: "schemaVersion", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.matches", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Path: baselinePath, Field: "schemaVersion", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Path: baselinePath, Field: "entries.0.filePath", Expected: "sample.txt"},
+			{
+				Type:     e2EAssertionJSONFieldEquals,
+				Path:     baselinePath,
+				Field:    "entries.0.message",
+				Expected: "Found token token=abc",
+			},
+			{Type: e2EAssertionJSONFieldEquals, Path: baselinePath, Field: "entries.0.count", Expected: 1},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)

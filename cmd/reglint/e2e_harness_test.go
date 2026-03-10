@@ -292,3 +292,21 @@ func TestE2EFull001BaselineCompareSuppressesNonRegressions(t *testing.T) {
 	result := harness.mustRunScenario(t, scenario)
 	harness.assertScenarioStderrEmpty(t, scenario, result)
 }
+
+func TestE2EFull002BaselineWriteOverwritesTargetAndExitsZero(t *testing.T) {
+	harness := newE2EHarness(t)
+
+	moduleRoot, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("resolve module root: %v", err)
+	}
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(baselinePath, []byte("{"), 0o600); err != nil {
+		t.Fatalf("seed baseline file: %v", err)
+	}
+
+	scenario := newE2EFull002Scenario(moduleRoot, baselinePath)
+	result := harness.mustRunScenario(t, scenario)
+	harness.assertScenarioStderrEmpty(t, scenario, result)
+}
