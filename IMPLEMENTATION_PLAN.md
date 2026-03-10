@@ -1,302 +1,237 @@
-# Implementation Plan (git-integration)
+# Implementation Plan (e2e-tests)
 
-**Status:** Git integration implementation complete (Phase 14 complete; 6/6 phases complete)
+**Status:** E2E spec and reference integration tests exist; compiled-binary e2e harness, `make test-e2e*` targets, and CI tier gates are not implemented (Phase 15 complete; 1/6 phases complete).
 **Last Updated:** 2026-03-10
-**Primary Specs:** `specs/git-integration.md` (related: `specs/cli-analyze.md`, `specs/configuration.md`, `specs/data-model.md`, `specs/ignore-files.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md`)
+**Primary Specs:** `specs/e2e-test-suite.md` (related: `specs/testing-and-validations.md`, `specs/cli-analyze.md`, `specs/cli-init.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/git-integration.md`, `specs/core-architecture.md`)
 
 ## Quick Reference
 
-| System / Subsystem                                                                                       | Specs                                                                                              | Modules / Packages                                                                                             | Artifacts                                                        | Status                                                                                                                    |
-| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| RuleSet Git schema and validation (`git.mode`, `git.diff`, `git.addedLinesOnly`, `git.gitignoreEnabled`) | `specs/configuration.md`, `specs/git-integration.md`, `specs/testing-and-validations.md`           | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` | `testdata/rules/*.yaml`, `internal/config/*_test.go`             | ✅ Implemented (schema, shared conversion/defaults, cross-field validation, and fixtures complete)                        |
-| Analyze Git flags and effective settings resolution                                                      | `specs/cli-analyze.md`, `specs/cli-help.md`, `specs/git-integration.md`                            | `internal/cli/analyze.go`, `internal/cli/help.go`, `internal/cli/cli.go`                                       | `internal/cli/*_test.go`, `cmd/reglint/main_test.go`             | ✅ Implemented (Git flags, help output, precedence, validation, and scan request threading)                               |
-| Git adapter and hook provider                                                                            | `specs/git-integration.md`, `specs/core-architecture.md`                                           | `internal/git/*`, `internal/hooks/*`                                                                           | package tests under `internal/git` and `internal/hooks`          | ✅ Implemented (Git adapter + hook contracts wired through analyze with deterministic order and fatal Git-enabled errors) |
-| Scan request Git constraints and line/file scoping                                                       | `specs/data-model.md`, `specs/cli-analyze.md`, `specs/git-integration.md`                          | `internal/scan/model.go`, `internal/scan/engine.go`, `internal/cli/analyze.go`                                 | `internal/scan/*_test.go`, `internal/cli/analyze_handle_test.go` | ✅ Implemented (candidate file scoping, added-lines filtering, and empty-scope handling complete)                         |
-| Ignore-file engine foundation (`.ignore`, `.reglintignore`)                                              | `specs/ignore-files.md`                                                                            | `internal/ignore/*`, `internal/scan/ignore_rules.go`                                                           | `internal/ignore/*_test.go`, `internal/scan/ignore_test.go`      | ✅ Implemented (reusable precedence foundation for Git mode)                                                              |
-| Deterministic scan ordering and formatter contracts                                                      | `specs/data-model.md`, `specs/formatter.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md` | `internal/scan/engine.go`, `internal/output/*`                                                                 | golden/output tests                                              | ✅ Implemented                                                                                                            |
-| Baseline compare/write behavior (related analyze flow)                                                   | `specs/cli-analyze-baseline.md`, `specs/cli-analyze.md`                                            | `internal/baseline/*`, `internal/cli/analyze.go`                                                               | `testdata/baseline/*`, baseline tests                            | ✅ Implemented                                                                                                            |
-| Git-focused docs and fixtures                                                                            | `specs/cli-analyze.md`, `specs/testing-and-validations.md`                                         | `README.md`, `testdata/rules/*`, `testdata/fixtures/*`, `Makefile`                                             | git-mode fixtures/examples, quality-gate evidence                | ✅ Implemented (README examples, Git fixtures, and quality-gate evidence complete)                                        |
+| System / Subsystem                                                         | Specs                                                                                 | Modules / Packages                                                                               | Artifacts                                                      | Status                                                      |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| Canonical e2e scenario catalog and tier policy                             | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md` | `specs/`                                                                                         | Scenario IDs `E2E-SMOKE-*`, `E2E-FULL-*`                       | ✅ Implemented (spec-only)                                  |
+| Existing command-level behavior coverage (in-process, not compiled binary) | `specs/cli.md`, `specs/cli-analyze.md`, `specs/cli-init.md`                           | `cmd/reglint/main_test.go`, `internal/cli/*_test.go`                                             | CLI contract tests for baseline, git, format, help, exit codes | ✅ Implemented                                              |
+| File-handling and deterministic ordering reference tests                   | `specs/testing-and-validations.md`, `specs/e2e-test-suite.md`                         | `internal/scan/engine_test.go`, `internal/scan/ignore_test.go`, `internal/output/golden_test.go` | Binary/oversized/unreadable handling tests, golden outputs     | ✅ Implemented                                              |
+| Compiled-binary e2e scenario harness                                       | `specs/e2e-test-suite.md`                                                             | `cmd/reglint/` (new e2e harness tests)                                                           | Scenario runner, replay command diagnostics                    | Missing                                                     |
+| PR smoke and nightly/manual full make targets                              | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`                         | `Makefile`                                                                                       | `make test-e2e-smoke`, `make test-e2e`                         | Missing                                                     |
+| CI gate policy for e2e tiers                                               | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`                         | `.github/workflows/*.yml`                                                                        | PR smoke e2e job, nightly scheduled full e2e job               | Missing                                                     |
+| Scenario-specific fixture workspaces for path/permission/git edge cases    | `specs/e2e-test-suite.md`                                                             | `testdata/fixtures/`, `testdata/rules/`, `testdata/baseline/`, `testdata/golden/`                | Stable fixture matrix for 21 scenarios                         | Partial (base fixtures exist; dedicated e2e matrix missing) |
 
-## Phase 9: Scope lock and stale-plan reset
+## Phase 15: Scope lock and stale-plan reset
 
-**Goal:** Confirm current Git-integration gaps and replace stale plan content.
+**Goal:** Confirm e2e requirements, verify real code gaps, and replace stale plan scope.
 **Status:** Complete
-**Paths:** `specs/git-integration.md`, `specs/cli-analyze.md`, `specs/configuration.md`, `specs/data-model.md`, `specs/ignore-files.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md`, `IMPLEMENTATION_PLAN.md`
-**Reference pattern:** `internal/cli/analyze.go`, `internal/scan/ignore_rules.go`
+**Paths:** `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md`, `specs/README.md`, `Makefile`, `.github/workflows/*.yml`, `cmd/reglint/main_test.go`, `IMPLEMENTATION_PLAN.md`
+**Reference pattern:** `cmd/reglint/main_test.go`, `internal/output/golden_test.go`
 
-### 9.1 Spec and history verification
+### 15.1 Spec and history verification
 
-- [x] Verified Git integration spec exists and is linked from `specs/README.md`.
-- [x] Verified scope-defining spec commit `0476869` updates Git integration plus related specs together.
-- [x] Verified Git scope includes cross-domain changes in CLI, config, data model, ignore precedence, and testing.
+- [x] Verified `specs/e2e-test-suite.md` exists and is indexed in `specs/README.md`.
+- [x] Verified e2e scope was introduced by spec commit `19a474b` touching `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md`, and `specs/README.md`.
+- [x] Verified e2e scope is cross-domain (analyze/init contracts, formatter outputs, git/ignore behavior, file handling, CI policy).
 
-### 9.2 Code reality and plan reset
+### 15.2 Code reality and plan reset
 
-- [x] Verified `internal/git` and `internal/hooks` packages do not exist.
-- [x] Verified `internal/cli/analyze.go` and `internal/cli/help.go` do not expose Git flags/settings.
-- [x] Verified `internal/config/*` and `internal/rules/model.go` do not model RuleSet `git` settings.
-- [x] Verified `internal/scan/model.go` has no Git scope fields and `internal/scan/engine.go` has no Git hook path.
-- [x] Replaced baseline-focused plan with this Git-integration gap plan.
+- [x] Verified current repo has no dedicated compiled-binary e2e harness files (`glob **/*e2e*_test.go` and `glob **/e2e/**` returned none).
+- [x] Verified `Makefile` does not provide `test-e2e-smoke` or `test-e2e` targets.
+- [x] Verified workflows do not include e2e smoke/full jobs or nightly `schedule` trigger.
+- [x] Verified prior `IMPLEMENTATION_PLAN.md` was scoped to `git-integration`, not `e2e-tests`.
 
 **Definition of Done**
 
-- Verification evidence is captured in the Verification Log.
-- Plan scope now matches `git-integration` and current codebase reality.
+- Gap evidence is captured in Verification Log entries with exact commands.
+- Plan scope now matches `e2e-tests` and current repository reality.
 
 **Risks/Dependencies**
 
-- Existing specs describe Git behavior as required while code lacks implementation; this is a release-risk if not tracked explicitly.
+- Spec requires black-box compiled-binary execution, while existing coverage is mostly in-process; this can hide packaging/process-boundary regressions.
 
-## Phase 10: RuleSet and shared model contracts
+## Phase 16: Compiled-binary harness foundation
 
-**Goal:** Add Git settings to configuration and shared models with spec-aligned validation.
-**Status:** Complete
-**Paths:** `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go`, `internal/config/*_test.go`, `internal/rules/*_test.go`, `testdata/rules/*.yaml`
-**Reference pattern:** `internal/config/model.go` and `internal/config/loader.go` existing validation style for `baseline`, `failOn`, `ignoreFiles*`
+**Goal:** Create deterministic e2e scenario runner that executes the built `reglint` binary and reports replayable diagnostics.
+**Status:** Not started
+**Paths:** `cmd/reglint/` (new e2e harness tests), `testdata/fixtures/**`, `testdata/rules/**`, `testdata/baseline/**`
+**Reference pattern:** helper/test setup style in `cmd/reglint/main_test.go`
 
-### 10.1 RuleSet schema updates
+### 16.1 Binary execution harness
 
-- [x] Add `git` settings struct to `config.RuleSet` with `mode`, `diff`, `addedLinesOnly`, `gitignoreEnabled`.
-- [x] Add corresponding fields in `rules.RuleSet` and copy-safe conversion in `config.RuleSet.ToRules()`.
-- [x] Preserve defaults expected by spec (`mode=off`, `diff` unset, `addedLinesOnly=false`, `gitignoreEnabled=true`).
+- [x] Verified build entrypoint already exists via `make build` (`Makefile` -> `bin/reglint`).
+- [ ] Add harness that builds binary once per run and executes per-scenario commands via process boundary.
+- [ ] Capture and assert exit code, stdout, stderr, and output artifacts per scenario.
+- [ ] Emit scenario ID + fixture path + replay command on every failure.
 
-### 10.2 Validation and fixture coverage
+### 16.2 Scenario model and assertion engine
 
-- [x] Add cross-field validation (`git.diff` valid only in `mode=diff`; `mode=diff` requires `git.diff`; `addedLinesOnly` only with `staged|diff`).
-- [x] Add loader tests for valid/invalid Git config combinations and error messages.
-- [x] Add sample rules fixtures for Git settings combinations under `testdata/rules/`.
+- [ ] Introduce typed scenario definition aligned to spec fields (`id`, `tier`, `fixture`, `command`, `env`, `expectedExit`, `assertions`).
+- [ ] Implement deterministic assertion types: stdout/stderr contains/not-contains/regex, file exists/not-exists, JSON/SARIF field equality.
+- [ ] Enforce deterministic scenario ordering and stable test logs.
 
 **Definition of Done**
 
-- `go test ./internal/config ./internal/rules` passes.
-- RuleSet conversion exposes effective Git settings for CLI/runtime use.
+- `make build` succeeds.
+- `go test ./cmd/reglint -run TestE2E` passes for harness-only tests.
+- Files touched: e2e harness tests under `cmd/reglint/` plus required test helpers.
 
 **Risks/Dependencies**
 
-- Cross-field validation can drift from CLI validation if error semantics are not centralized.
+- Cross-platform command quoting, temp-path normalization, and binary path resolution can make output assertions flaky if not normalized.
 
-## Phase 11: Analyze CLI flags and settings precedence
+## Phase 17: Smoke tier implementation (PR gate)
 
-**Goal:** Add Git CLI flags, help output, and effective settings resolution.
-**Status:** Complete
-**Paths:** `internal/cli/analyze.go`, `internal/cli/help.go`, `internal/cli/cli_test.go`, `internal/cli/analyze_test.go`, `internal/cli/scan_request_test.go`, `cmd/reglint/main_test.go`
-**Reference pattern:** baseline precedence flow in `internal/cli/analyze.go` (`resolveBaselinePaths`, `prepareAnalyzeConfig`)
+**Goal:** Implement PR-blocking smoke scenarios `E2E-SMOKE-001..006` using the compiled binary harness.
+**Status:** Not started
+**Paths:** `cmd/reglint/` (new smoke scenario tests), `testdata/fixtures/**`, `testdata/rules/**`
+**Reference pattern:** behavior assertions in `cmd/reglint/main_test.go`
 
-### 11.1 Flag parsing and help exposure
+### 17.1 Core smoke flows
 
-- [x] Add `--git-mode`, `--git-diff`, `--git-added-lines-only`, and `--no-gitignore` to analyze flag parsing.
-- [x] Extend `cli.Config` with Git fields required by `specs/cli-analyze.md`.
-- [x] Update help output snapshots to include all Git flags.
+- [x] Verified in-process references exist for happy-path/fail-path/NO_COLOR flows in `cmd/reglint/main_test.go`.
+- [ ] Implement `E2E-SMOKE-001` analyze happy path (exit `0`, deterministic summary contract).
+- [ ] Implement `E2E-SMOKE-002` invalid config path/content (single actionable error, exit `1`).
+- [ ] Implement `E2E-SMOKE-003` fail-on threshold exceeded (exit `2`).
+- [ ] Implement `E2E-SMOKE-004` no-findings scenario (exit `0`).
+- [ ] Implement `E2E-SMOKE-005` `NO_COLOR=1` disables ANSI output.
 
-### 11.2 Effective settings and validation
+### 17.2 Path edge and determinism
 
-- [x] Implement precedence `defaults -> RuleSet git.* -> CLI`, with `--git-diff` forcing effective `diff` mode.
-- [x] Enforce CLI validation rules (single error message, exit code 1 via existing error path).
-- [x] Thread effective Git settings into scan request assembly.
+- [x] Verified path-with-space coverage currently exists only in formatter-level tests (`internal/output/file_uri_test.go`), not process-level CLI.
+- [ ] Implement `E2E-SMOKE-006` path containing spaces with correct path reporting.
+- [ ] Ensure smoke scenarios remain deterministic and non-flaky over repeated runs.
 
 **Definition of Done**
 
-- `go test ./internal/cli ./cmd/reglint` passes with Git-flag cases.
-- Analyze help for `analyze` and `analyse` includes Git flags and defaults.
+- `make test-e2e-smoke` passes locally.
+- Smoke failures print scenario IDs and replay commands.
+- Files touched: smoke scenario tests and any required fixture additions.
 
 **Risks/Dependencies**
 
-- Precedence interactions with existing baseline and ignore flags can introduce subtle regressions.
+- Platform-dependent path escaping can break path-with-space assertions if fixture setup is not normalized.
 
-## Phase 12: Git adapter and hook infrastructure
+## Phase 18: Full matrix implementation (nightly/manual)
 
-**Goal:** Introduce Git runtime services and deterministic hook contracts.
-**Status:** Complete
-**Paths:** `internal/git/*.go`, `internal/hooks/*.go`, `internal/cli/analyze.go`, `internal/git/*_test.go`, `internal/hooks/*_test.go`
-**Reference pattern:** deterministic root-scoped rule loading in `internal/scan/ignore_rules.go`
+**Goal:** Implement full matrix scenarios `E2E-FULL-001..015` for baseline, formatters, git scope, file handling, ignore precedence, and ordering.
+**Status:** Not started
+**Paths:** `cmd/reglint/` (new full scenario tests), `testdata/baseline/**`, `testdata/rules/**`, `testdata/fixtures/**`, `testdata/golden/**`
+**Reference pattern:** `cmd/reglint/main_test.go`, `internal/scan/engine_test.go`, `internal/scan/ignore_test.go`, `internal/output/golden_test.go`
 
-### 12.1 Git adapter services
+### 18.1 Baseline and formatter scenarios
 
-- [x] Implement Git capability checks (binary availability and repository context) gated by mode.
-- [x] Implement staged file selection and diff-target file selection with normalized root-relative slash paths.
-- [x] Implement added-line extraction (`addedLinesByFile`) from Git diff/staging output.
+- [x] Verified baseline compare/write/precedence and JSON/SARIF contracts already have in-process reference coverage.
+- [ ] Implement compiled-binary scenarios `E2E-FULL-001..006`.
 
-### 12.2 Hook model integration
+### 18.2 Git mode scenarios
 
-- [x] Add hook contracts for capability checks, candidate scoping, ignore augmentation, and post-match filtering.
-- [x] Register Git hooks only when Git mode is enabled; keep `mode=off` path no-op.
-- [x] Ensure hook execution order is deterministic and failures are fatal only in Git-enabled modes.
+- [x] Verified in-process references exist for `git-mode off|staged|diff|added-lines|outside-repo|invalid-target` in `cmd/reglint/main_test.go`.
+- [ ] Implement compiled-binary scenarios `E2E-FULL-007..011` with temp Git repos and controlled environment.
+
+### 18.3 File handling, ignore precedence, and ordering
+
+- [x] Verified lower-level references for binary/oversized/unreadable handling and deterministic ordering exist in scan/output tests.
+- [ ] Implement compiled-binary scenarios `E2E-FULL-012..015` including `.reglintignore > .ignore > .gitignore` precedence.
 
 **Definition of Done**
 
-- `go test ./internal/git ./internal/hooks` passes.
-- Hook behavior matches `specs/git-integration.md` contracts and error semantics.
+- `make test-e2e` passes locally with all 15 full scenario IDs.
+- Repeated local full runs over identical fixture states produce identical ordering assertions.
+- Files touched: full scenario tests and fixture additions/updates.
 
 **Risks/Dependencies**
 
-- Git command output parsing must stay deterministic across supported platforms.
+- Git and permission-dependent scenarios can vary by OS; fixtures and assertions must avoid platform-specific nondeterminism.
 
-## Phase 13: Scan engine and ignore precedence integration
+## Phase 19: Developer tooling and CI gate wiring
 
-**Goal:** Apply Git-selected file/line constraints while preserving current deterministic scan behavior.
-**Status:** Complete
-**Paths:** `internal/scan/model.go`, `internal/scan/engine.go`, `internal/scan/ignore_rules.go`, `internal/ignore/*`, `internal/cli/analyze.go`, `internal/scan/*_test.go`, `internal/ignore/*_test.go`, `internal/cli/analyze_handle_test.go`
-**Reference pattern:** candidate collection + deterministic sorting in `internal/scan/engine.go`
+**Goal:** Add local make targets and CI enforcement for smoke/full e2e tiers.
+**Status:** Not started
+**Paths:** `Makefile`, `.github/workflows/quality.yml`, `.github/workflows/security.yml` (or new e2e workflow files)
+**Reference pattern:** existing job structure in `.github/workflows/quality.yml`
 
-### 13.1 Candidate selection and ignore precedence
+### 19.1 Local command targets
 
-- [x] Extend `scan.Request` with optional Git selection constraints per `specs/data-model.md`.
-- [x] Apply Git candidate selection before include/exclude and ignore evaluation.
-- [x] Implement `.gitignore` augmentation when enabled, with precedence `.gitignore` < `.ignore` < `.reglintignore`.
+- [ ] Add `make test-e2e-smoke` for PR-required tier.
+- [ ] Add `make test-e2e` for full matrix tier.
+- [ ] Keep target behavior deterministic and independent from unrelated quality jobs.
 
-### 13.2 Added-lines-only filtering and deterministic results
+### 19.2 CI policy enforcement
 
-- [x] Apply added-lines filtering only for `mode=staged|diff` when enabled.
-- [x] Ensure files without added lines report zero matches in added-lines mode.
-- [x] Preserve deterministic ordering and unchanged formatter schemas.
+- [x] Verified current workflows have no e2e test jobs and no nightly `schedule` trigger.
+- [ ] Add PR smoke e2e job (blocking gate).
+- [ ] Add nightly/manual full e2e job.
+- [ ] Ensure CI outputs include scenario-level diagnostics and replay commands.
 
 **Definition of Done**
 
-- `go test ./internal/scan ./internal/ignore` passes with Git precedence and added-line cases.
-- Repeated runs with same repo state yield stable file and match ordering.
+- PR workflow runs smoke e2e and fails on scenario failures.
+- Nightly/manual workflow runs full matrix deterministically.
+- Files touched: `Makefile` and workflow YAMLs.
 
 **Risks/Dependencies**
 
-- Path normalization and root-relative mapping errors can silently drop or misattribute matches.
+- CI runtime budget and Git tool availability may require job tuning (caching, selective fixture setup).
 
-## Phase 14: Integration verification, docs, and quality gates
+## Phase 20: Verification evidence and documentation alignment
 
-**Goal:** Close remaining gaps with end-to-end coverage, docs alignment, and quality gate evidence.
-**Status:** Complete
-**Paths:** `cmd/reglint/main_test.go`, `internal/cli/*_test.go`, `internal/scan/*_test.go`, `testdata/rules/*`, `testdata/fixtures/*`, `README.md`, `Makefile`
-**Reference pattern:** existing command-level integration harness in `cmd/reglint/main_test.go`
+**Goal:** Produce reproducible verification evidence and align user/developer docs with implemented e2e commands.
+**Status:** Not started
+**Paths:** `README.md`, `Makefile`, `.github/workflows/*.yml`, `cmd/reglint/` e2e tests, `IMPLEMENTATION_PLAN.md`
+**Reference pattern:** verification sections in `specs/e2e-test-suite.md` and `specs/testing-and-validations.md`
 
-### 14.1 Git behavior matrix coverage
+### 20.1 Verification runs and logging
 
-- [x] Add integration tests for `git-mode=off|staged|diff` success/error paths.
-- [x] Add tests for `--git-diff` implied mode, invalid diff targets, and missing Git binary handling.
-- [x] Add tests for added-lines-only output behavior and ignore precedence conflicts.
+- [ ] Run and record: `make build`, `make test-e2e-smoke`, `make test-e2e`, and `make quality`.
+- [ ] Record scenario-level pass/fail evidence and deterministic rerun checks.
+- [ ] Document files touched for each verification/fix cycle.
 
-### 14.2 Docs and final quality checks
+### 20.2 Documentation touchpoints
 
-- [x] Add README examples for Git mode usage and expected exit behavior.
-- [x] Ensure analyze help/output tests remain deterministic after Git flag additions.
-- [x] Run and log `go test ./...`, `make test`, `make lint`, and `make quality`.
+- [x] Verified e2e command expectations are already documented in specs.
+- [ ] Update `README.md` with e2e smoke/full commands and usage expectations (if implementation scope includes docs update).
+- [ ] Ensure any contributor guidance references the exact make target names.
 
 **Definition of Done**
 
-- All spec verification bullets for Git integration are covered by tests and/or reproducible commands.
-- Quality gates pass and Verification Log records outcomes.
+- Verification log contains exact commands and outcomes for all required e2e gates.
+- Docs and runnable commands are consistent with implemented targets.
 
 **Risks/Dependencies**
 
-- Git-dependent tests can be flaky without strict temp-repo setup and deterministic commit/diff fixtures.
+- Command-name drift between docs and Make/workflow wiring can cause false CI or onboarding failures.
 
 ## Verification Log
 
-- 2026-03-09: Read `specs/README.md` - confirmed `Git Integration` is indexed; tests run: none (planning mode); bug fixes discovered: none; files touched: `specs/README.md`.
-- 2026-03-09: Read `specs/git-integration.md` - captured hook contracts, settings, precedence, and verification matrix; tests run: none; bug fixes discovered: none; files touched: `specs/git-integration.md`.
-- 2026-03-09: Read `specs/cli-analyze.md`, `specs/configuration.md`, `specs/data-model.md`, `specs/ignore-files.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md` - confirmed cross-domain Git requirements; tests run: none; bug fixes discovered: none; files touched: listed spec files.
-- 2026-03-09: `git log --oneline --decorate -n 30 -- specs/git-integration.md` - confirmed latest Git scope commit `0476869`; tests run: none; bug fixes discovered: none; files touched: `specs/git-integration.md`.
-- 2026-03-09: `git show --name-only --oneline 0476869` - verified related specs changed together (`cli`, `configuration`, `data-model`, `ignore-files`, `testing`, `core-architecture`); tests run: none; bug fixes discovered: none; files touched: spec files listed by command.
-- 2026-03-09: `glob internal/git/**/*.go` and `glob internal/hooks/**/*.go` - no Git integration packages found; tests run: none; bug fixes discovered: none; files touched: none.
-- 2026-03-09: `grep "git-mode|git\.mode|--git-diff|--no-gitignore" --include "*.go"` - no runtime Git support found in Go sources; tests run: none; bug fixes discovered: none; files touched: none.
-- 2026-03-09: Read `internal/cli/analyze.go` and `internal/cli/help.go` - verified baseline/ignore features exist and Git flags are absent; tests run: none; bug fixes discovered: none; files touched: `internal/cli/analyze.go`, `internal/cli/help.go`.
-- 2026-03-09: Read `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go` - verified RuleSet has no Git settings model/validation; tests run: none; bug fixes discovered: none; files touched: listed config/rules files.
-- 2026-03-09: Read `internal/scan/model.go`, `internal/scan/engine.go`, `internal/scan/ignore_rules.go` - verified no Git request constraints/hooks and confirmed deterministic scan/ignore foundation exists; tests run: none; bug fixes discovered: none; files touched: listed scan files.
-- 2026-03-09: `glob testdata/**/*git*` and read `testdata/rules/*.yaml` - verified no Git fixtures currently exist; tests run: none; bug fixes discovered: none; files touched: `testdata/rules/example.yaml`, `testdata/rules/fail.yaml`, `testdata/rules/baseline.yaml`.
-- 2026-03-09: Plan-only update - replaced stale baseline-scoped plan with Git-integration plan reflecting current gaps; tests run: none; bug fixes discovered: stale plan corrected; files touched: `IMPLEMENTATION_PLAN.md`.
-- 2026-03-10: `go test ./internal/config ./internal/rules` - passed.
-- 2026-03-10: `go clean -testcache && go test -coverprofile=/tmp/no-cache-cover.out -covermode=atomic -coverpkg=./... ./... && go tool cover -func=/tmp/no-cache-cover.out` - passed with total coverage 94.5%.
-- 2026-03-10: `git commit -m "Add Git settings to RuleSet models and conversions"` - committed Phase 10.1 model updates as `b68d18d`.
-- 2026-03-10: `go test ./internal/config -run "TestLoadRuleSet(RejectsInvalidGitMode|RejectsEmptyGitDiff|RejectsGitDiffOutsideDiffMode|RejectsGitModeDiffWithoutDiff|RejectsGitAddedLinesOnlyWithoutGitMode|AllowsGitAddedLinesOnlyWithStagedMode)"` - failed first (expected for RED), then passed after implementing validation.
-- 2026-03-10: `go test ./internal/config ./internal/rules` - passed with Phase 10.2 changes.
-- 2026-03-10: `make lint` - passed after refactoring validation helper complexity and test line-length issues.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `git commit -m "Add Git config cross-field validation and fixtures"` - committed Phase 10.2 updates as `03447f4`.
-- 2026-03-10: `go test ./internal/cli -run "TestParseAnalyzeGitDefaults|TestParseAnalyzeGitFlags|TestParseAnalyzeRejectsInvalidGitMode|TestParseAnalyzeGitDiffImpliesDiffMode"` - passed.
-- 2026-03-10: `go test ./internal/cli -run "TestBuildScanRequestUsesRuleSetGitSettingsWithoutCLIOverrides|TestBuildScanRequestCLIOverridesRuleSetGitSettings|TestBuildScanRequestGitDiffForcesDiffMode|TestBuildScanRequestGitModeOffReturnsNilGitRequest"` - passed.
-- 2026-03-10: `go test ./internal/cli -run "TestPrepareAnalyzeConfigUsesRuleSetGitSettings|TestPrepareAnalyzeConfigCLIOverridesRuleSetGitSettings|TestPrepareAnalyzeConfigGitDiffForcesDiffMode|TestPrepareAnalyzeConfigRejectsDiffModeWithoutDiffTarget|TestPrepareAnalyzeConfigRejectsAddedLinesOnlyWithOffMode"` - passed.
-- 2026-03-10: `go test ./internal/cli -run "TestHandleAnalyzeRejectsGitModeDiffWithoutGitDiff|TestHandleAnalyzeRejectsGitAddedLinesOnlyWithGitModeOff"` - passed.
-- 2026-03-10: `go test ./internal/git -run TestCheckCapabilitiesModeOffIsNoOp` - failed (RED): missing `internal/git` implementation and capability contracts.
-- 2026-03-10: `go test ./internal/git -run "TestCheckCapabilities"` - passed after implementing `internal/git/adapter.go` capability checks.
-- 2026-03-10: `go test ./internal/cli -run "TestRunAnalyzeChecksGitCapabilitiesWhenModeEnabled|TestRunAnalyzeSkipsGitCapabilitiesWhenModeOff"` - passed after wiring capability checks into analyze flow.
-- 2026-03-10: `go test ./internal/cli ./internal/git` - passed.
-- 2026-03-10: `make lint` - passed.
-- 2026-03-10: `make arch` - passed.
-- 2026-03-10: `make security` - passed.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `git commit -m "Add Git capability checks for enabled analyze modes"` - committed Phase 12.1 capability checks as `06b7ea1`.
-- 2026-03-10: `go test ./internal/git -run "TestSelectCandidateFiles"` - failed (RED expected; candidate selection API not implemented yet).
-- 2026-03-10: `go test ./internal/git -run "TestSelectCandidateFiles|TestCheckCapabilities"` - passed after implementing staged/diff candidate selection.
-- 2026-03-10: `make lint` - failed first (revive/mnd issues in new git selection code), then passed after fixes.
-- 2026-03-10: `go test ./internal/git` - passed.
-- 2026-03-10: `make test` - passed.
-- 2026-03-10: `git commit -m "Add Git candidate file selection for staged and diff modes"` - committed Phase 12.1 candidate selection as `2df82a4`.
-- 2026-03-10: `go test ./internal/git -run "TestSelectAddedLines|TestParseAddedLines"` - failed first (RED): added-line extraction API was missing.
-- 2026-03-10: `go test ./internal/git -run "TestSelectAddedLines|TestParseAddedLines"` - passed after implementing added-line extraction and parser.
-- 2026-03-10: `make lint` - failed first (cyclop/mnd in added-lines parser), then passed after refactor.
-- 2026-03-10: `go test ./internal/git ./internal/cli` - passed.
-- 2026-03-10: `make test` - passed.
-- 2026-03-10: `git commit -m "Add Git added-line extraction for scoped scans"` - committed Phase 12.1 added-line extraction as `9a86a6b`.
-- 2026-03-10: `go test ./internal/hooks -run TestRegistry` - failed first (RED): hook contracts/registry package did not exist.
-- 2026-03-10: `go test ./internal/hooks ./internal/git -run "Test(Registry|GitHookProvider)"` - passed after implementing hook registry and Git hook provider.
-- 2026-03-10: `go test ./internal/cli -run "TestRunAnalyze(RunsGitSelectionHooksWhenModeEnabled|SkipsGitSelectionHooksWhenModeOff|ReturnsSelectionHookErrorWhenGitEnabled|FiltersMatchesByAddedLinesHook)"` - passed after wiring hook pipeline into analyze.
-- 2026-03-10: `make arch` - failed first because `internal/hooks/**` was not mapped in `.go-arch-lint.yml`, then passed after adding hooks component mapping.
-- 2026-03-10: `go test ./... && make lint && make arch && make test` - passed.
-- 2026-03-10: `git commit -m "Add Git scan hook registry and provider pipeline"` - committed Phase 12.2 hook model integration as `b05d615`.
-- 2026-03-10: `go test ./internal/scan ./internal/cli ./internal/git ./internal/hooks` - passed.
-- 2026-03-10: `go test ./internal/ignore` - passed.
-- 2026-03-10: `make lint` - passed.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `make test` - passed.
-- 2026-03-10: `git commit -m "Apply Git candidate and added-line scan scoping"` - committed Phase 13 scan-engine and CLI integration updates as `3671290`.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunAnalyzeGitMode"` - failed first due `t.Setenv` with `t.Parallel`; updated test to run non-parallel for env override.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunAnalyzeGitMode"` - passed after adding Git mode integration matrix tests (`off`, `staged`, `diff` success/error paths).
-- 2026-03-10: `go test ./cmd/reglint` - passed.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunAnalyzeGit(ModeStagedWithoutGitBinaryReturnsError|DiffFlagImpliesDiffModeAndScopesCandidates|DiffFlagInvalidTargetReturnsError)"` - passed.
-- 2026-03-10: `go test ./cmd/reglint` - passed.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `git commit -m "Add command-level coverage for implied and failure Git diff flows"` - committed Phase 14.1 implied-mode/error matrix tests as `f10f3fa`.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunAnalyzeGitModeStaged(AddedLinesOnlyReportsOnlyAddedLines|IgnoreConflictPrefersIgnoreOverGitignore|IgnoreConflictPrefersReglintignoreOverIgnoreAndGitignore)$"` - failed first (RED): added-lines-only integration test returned zero matches due Git diff path prefixes.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunAnalyzeGitModeStaged(AddedLinesOnlyReportsOnlyAddedLines|IgnoreConflictPrefersIgnoreOverGitignore|IgnoreConflictPrefersReglintignoreOverIgnoreAndGitignore)$"` - passed after normalizing Git diff output paths for added-lines extraction.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `git commit -m "Normalize Git added-line paths and add command coverage"` - committed Phase 14.1 added-lines/ignore-precedence matrix tests and added-lines path normalization as `1a2c754`.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunAnalyzeGitMode(OffDoesNotRequireGit|StagedScansOnlyStagedFiles|DiffScansOnlyChangedFiles)$"` - passed.
-- 2026-03-10: `git commit -m "Document Git-scoped analyze usage and exits"` - passed (commit `99bcb00`).
-- 2026-03-10: `go run ./cmd/reglint --help` - passed.
-- 2026-03-10: `go run ./cmd/reglint analyze --help` - passed.
-- 2026-03-10: `go run ./cmd/reglint analyse --help` - passed.
-- 2026-03-10: `go test ./cmd/reglint -run "TestRunShowsRootHelpForLongFlag|TestRunShowsRootHelpForShortFlag|TestRunShowsAnalyzeHelpForLongFlag|TestRunShowsAnalyseHelpForShortFlag|TestRunUnknownCommandWithHelpFlag"` - passed.
-- 2026-03-10: `go test ./internal/cli -run "TestRunShowsHelpForRootFlag|TestRunShowsHelpForAnalyzeFlag|TestRunShowsHelpForAnalyseFlag|TestRunUnknownCommandWithHelpFlag"` - passed.
-- 2026-03-10: `go test ./cmd/reglint` - passed.
-- 2026-03-10: `go test ./...` - passed.
-- 2026-03-10: `make test` - passed.
-- 2026-03-10: `make lint` - passed.
-- 2026-03-10: `make quality` - failed (`Coverage 89.9% is below required 90%`) due cached coverage instrumentation.
-- 2026-03-10: `go clean -testcache && go test -count=1 -coverprofile=<tmp> -covermode=atomic -coverpkg=./... ./... && go tool cover -func=<tmp>` - passed (`total: 93.3%`).
-- 2026-03-10: `make quality` - passed after updating `Makefile` coverage gate to run uncached tests (`go test -count=1 ...`).
-- 2026-03-10: `git commit -m "Stabilize coverage gate with uncached tests"` - passed (commit `eaab4dd`).
+- 2026-03-10: `Read IMPLEMENTATION_PLAN.md` - confirmed existing plan was scoped to `git-integration`, not `e2e-tests`; tests run: none (planning mode); bug fixes discovered: stale scope mismatch; files touched: `IMPLEMENTATION_PLAN.md`.
+- 2026-03-10: `Read specs/README.md` and `Read specs/e2e-test-suite.md` - confirmed canonical e2e spec is indexed and defines 6 smoke + 15 full scenarios; tests run: none; bug fixes discovered: none; files touched: `specs/README.md`, `specs/e2e-test-suite.md`.
+- 2026-03-10: `Read specs/testing-and-validations.md` and `Read specs/cli-analyze.md` - confirmed e2e command/CI policy requirements and scenario cross-references; tests run: none; bug fixes discovered: none; files touched: `specs/testing-and-validations.md`, `specs/cli-analyze.md`.
+- 2026-03-10: `git log --oneline --decorate -n 30 -- specs/e2e-test-suite.md` - confirmed latest e2e spec commit is `19a474b`; tests run: none; bug fixes discovered: none; files touched: `specs/e2e-test-suite.md`.
+- 2026-03-10: `git show --name-only --oneline 19a474b` and `git show --stat --oneline 19a474b` - verified related spec updates landed together (`README`, `cli-analyze`, `testing-and-validations`, `e2e-test-suite`); tests run: none; bug fixes discovered: none; files touched: listed spec files.
+- 2026-03-10: `glob **/*e2e*`, `glob **/*e2e*_test.go`, `glob **/e2e/**` - verified no dedicated e2e harness files/directories exist; tests run: none; bug fixes discovered: none; files touched: none.
+- 2026-03-10: `Read Makefile` and `grep "make test-e2e-smoke|make test-e2e"` - verified required e2e make targets are missing; tests run: none; bug fixes discovered: none; files touched: `Makefile`.
+- 2026-03-10: `Read .github/workflows/quality.yml`, `Read .github/workflows/security.yml`, and `grep "schedule:|test-e2e|smoke|nightly" .github/workflows/*.yml` - verified workflows have no e2e jobs and no nightly schedule trigger; tests run: none; bug fixes discovered: none; files touched: `.github/workflows/quality.yml`, `.github/workflows/security.yml`.
+- 2026-03-10: `Read cmd/reglint/main_test.go` and `grep "NO_COLOR|--git-mode|--write-baseline" cmd/reglint/main_test.go` - verified broad in-process command-level coverage exists for many e2e behaviors but not compiled-binary scenario harness; tests run: none; bug fixes discovered: none; files touched: `cmd/reglint/main_test.go`.
+- 2026-03-10: `Read internal/scan/engine_test.go`, `Read internal/cli/analyze_output_test.go`, and `Read internal/output/golden_test.go` - verified lower-level references exist for file handling, deterministic ordering, and formatter contracts; tests run: none; bug fixes discovered: none; files touched: listed test files.
+- 2026-03-10: Plan-only update - replaced stale scope with this `e2e-tests` implementation plan and current verified gaps; tests run: none; bug fixes discovered: stale planning scope corrected; files touched: `IMPLEMENTATION_PLAN.md`.
 
 ## Summary
 
-| Phase                                                       | Status   |
-| ----------------------------------------------------------- | -------- |
-| Phase 9: Scope lock and stale-plan reset                    | Complete |
-| Phase 10: RuleSet and shared model contracts                | Complete |
-| Phase 11: Analyze CLI flags and settings precedence         | Complete |
-| Phase 12: Git adapter and hook infrastructure               | Complete |
-| Phase 13: Scan engine and ignore precedence integration     | Complete |
-| Phase 14: Integration verification, docs, and quality gates | Complete |
+| Phase                                                       | Status      |
+| ----------------------------------------------------------- | ----------- |
+| Phase 15: Scope lock and stale-plan reset                   | Complete    |
+| Phase 16: Compiled-binary harness foundation                | Not started |
+| Phase 17: Smoke tier implementation (PR gate)               | Not started |
+| Phase 18: Full matrix implementation (nightly/manual)       | Not started |
+| Phase 19: Developer tooling and CI gate wiring              | Not started |
+| Phase 20: Verification evidence and documentation alignment | Not started |
 
-**Remaining effort:** None.
+**Remaining effort:** Implement compiled-binary e2e harness, wire 21 scenario IDs across smoke/full tiers, add `make test-e2e-smoke` and `make test-e2e`, add PR/nightly CI gates, and capture execution evidence.
 
 ## Known Existing Work
 
-- `internal/ignore/loader.go`, `internal/ignore/parser.go`, `internal/ignore/matcher.go`, and `internal/scan/ignore_rules.go` already provide deterministic `.ignore`/`.reglintignore` support and are the reference for Git-ignore precedence integration.
-- `internal/scan/engine.go` now applies Git candidate-file scoping and added-lines filtering while preserving deterministic file and match ordering.
-- `internal/cli/analyze.go` already has robust precedence patterns (baseline path resolution and ignore toggles) that should be reused for Git settings precedence.
-- `internal/cli/help.go` and `internal/cli/cli_test.go` already enforce strict help snapshots and should be extended (not replaced) for Git flags.
-- `internal/baseline/*` and `internal/output/*` already implement baseline compare/write behavior and stable formatter schemas that Git integration must not alter.
-- `internal/git/adapter.go`, `internal/git/selection.go`, `internal/git/added_lines.go`, and `internal/git/hook_provider.go` now provide capability checks, deterministic staged/diff candidate-file selection, added-line extraction, and Git hook-provider behavior for Git-enabled runs.
-- `internal/hooks/scan_hooks.go` now provides deterministic hook contracts/registry execution for capabilities checks, candidate scoping, ignore augmentation, and post-match filtering.
-- `README.md` now includes a dedicated Git-scoped usage section covering `--git-mode`, `--git-diff` implied mode, `--git-added-lines-only`, `--no-gitignore`, and expected Git-enabled exit behavior.
+- `cmd/reglint/main_test.go` already provides extensive command-level behavior assertions for baseline, git mode, formatter outputs, help, and exit codes; reuse these as scenario assertion references.
+- `internal/cli/analyze_output_test.go` already validates JSON/SARIF output path and multi-format constraints needed by full-tier formatter scenarios.
+- `internal/scan/engine_test.go` already validates binary/oversized skipping, unreadable-file handling, and added-lines behavior; these are strong references for full-tier edge scenarios.
+- `internal/scan/ignore_test.go` already covers ignore precedence and git candidate-scope ordering; use this as canonical precedence behavior.
+- `internal/output/golden_test.go` and `testdata/golden/*` already enforce deterministic formatter output ordering.
+- `Makefile` already provides `make build`, `make test`, and `make quality`; e2e targets can follow existing target style.
 
 ## Manual Deployment Tasks
 
