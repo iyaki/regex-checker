@@ -354,3 +354,17 @@ func TestE2EFull005SARIFOnlyFormatWritesToStdoutWhenOutPathUnset(t *testing.T) {
 	result := harness.mustRunScenario(t, scenario)
 	harness.assertScenarioStderrEmpty(t, scenario, result)
 }
+
+func TestE2EFull006MultiFormatRequiresExplicitOutputPaths(t *testing.T) {
+	harness := newE2EHarness(t)
+
+	moduleRoot, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("resolve module root: %v", err)
+	}
+
+	outJSONPath := filepath.Join(t.TempDir(), "result.json")
+	scenario := newE2EFull006Scenario(moduleRoot, outJSONPath)
+	result := harness.mustRunScenario(t, scenario)
+	harness.assertScenarioStderrEmpty(t, scenario, result)
+}

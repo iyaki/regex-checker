@@ -488,6 +488,32 @@ func newE2EFull005Scenario(moduleRoot string) e2EScenario {
 	}
 }
 
+func newE2EFull006Scenario(moduleRoot, outJSONPath string) e2EScenario {
+	fixturePath := moduleRoot
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "example.yaml")
+	scanPath := filepath.Join("testdata", "fixtures")
+
+	return e2EScenario{
+		ID:      "E2E-FULL-006",
+		Tier:    "full",
+		Name:    "multi-format requires explicit out paths",
+		Fixture: fixturePath,
+		Command: []string{
+			"analyze",
+			"--config", configPath,
+			"--format", "json,sarif",
+			"--out-json", outJSONPath,
+			scanPath,
+		},
+		ExpectedExit: 1,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionStdoutRegex, Value: `^--out-sarif is required when requesting sarif with multiple formats\n?$`},
+			{Type: e2EAssertionStdoutNotContains, Value: "Summary:"},
+			{Type: e2EAssertionFileNotExists, Path: outJSONPath},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)
