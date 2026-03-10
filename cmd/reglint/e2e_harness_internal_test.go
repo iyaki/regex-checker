@@ -412,6 +412,32 @@ func newE2EFull002Scenario(moduleRoot, baselinePath string) e2EScenario {
 	}
 }
 
+func newE2EFull003Scenario(moduleRoot, baselinePath string) e2EScenario {
+	fixturePath := moduleRoot
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "baseline.yaml")
+	scanPath := filepath.Join("testdata", "fixtures")
+
+	return e2EScenario{
+		ID:      "E2E-FULL-003",
+		Tier:    "full",
+		Name:    "baseline path precedence prefers --baseline over ruleset baseline",
+		Fixture: fixturePath,
+		Command: []string{
+			"analyze",
+			"--config", configPath,
+			"--baseline", baselinePath,
+			scanPath,
+		},
+		ExpectedExit: 2,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionStdoutContains, Value: "Found token token=abc"},
+			{Type: e2EAssertionStdoutContains, Value: "sample.txt:1"},
+			{Type: e2EAssertionStdoutRegex, Value: `(?m)^Summary: files=1 skipped=0 matches=1 durationMs=[0-9]+$`},
+			{Type: e2EAssertionStdoutNotContains, Value: "No matches found."},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)
