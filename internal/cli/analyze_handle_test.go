@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/iyaki/reglint/internal/baseline"
+	"github.com/iyaki/reglint/internal/git"
 	"github.com/iyaki/reglint/internal/output"
 	"github.com/iyaki/reglint/internal/rules"
 )
@@ -422,6 +423,83 @@ func TestHandleAnalyzeRejectsGitAddedLinesOnlyWithGitModeOff(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeChecksGitCapabilitiesWhenModeEnabled(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	called := false
+	var gotRequest git.CapabilityRequest
+	restore := setCheckGitCapabilitiesHook(t, func(request git.CapabilityRequest) error {
+		called = true
+		gotRequest = request
+
+		return errors.New("git mode staged requires git executable")
+	})
+	t.Cleanup(restore)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{
+		"--config", configPath,
+		"--git-mode", "staged",
+		rootDir,
+	})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !called {
+		t.Fatal("expected git capability check to be invoked")
+	}
+	if gotRequest.Mode != "staged" {
+		t.Fatalf("expected mode staged, got %q", gotRequest.Mode)
+	}
+	if gotRequest.WorkingDir != rootDir {
+		t.Fatalf("expected working dir %q, got %q", rootDir, gotRequest.WorkingDir)
+	}
+	if !strings.Contains(err.Error(), "git mode staged requires git executable") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunAnalyzeSkipsGitCapabilitiesWhenModeOff(t *testing.T) {
+	t.Parallel()
+	setAnalyzeCwd(t)
+
+	rootDir := t.TempDir()
+	writeFile(t, rootDir, "sample.txt", "clean")
+	configPath := writeConfig(t, sampleConfig())
+
+	calls := 0
+	restore := setCheckGitCapabilitiesHook(t, func(git.CapabilityRequest) error {
+		calls++
+
+		return errors.New("should not be called")
+	})
+	t.Cleanup(restore)
+
+	result, failOn, formats, ruleSet, cfg, colors, err := runAnalyze([]string{"--config", configPath, rootDir})
+	_ = result
+	_ = failOn
+	_ = formats
+	_ = ruleSet
+	_ = cfg
+	_ = colors
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("expected 0 capability checks, got %d", calls)
+	}
+}
+
 func TestSeverityRankUnknown(t *testing.T) {
 	t.Parallel()
 
@@ -509,4 +587,15 @@ func setAnalyzeCwd(t *testing.T) {
 		_ = os.Chdir(current)
 		outputRegistry = currentRegistry
 	})
+}
+
+func setCheckGitCapabilitiesHook(t *testing.T, hook func(git.CapabilityRequest) error) func() {
+	t.Helper()
+
+	original := checkGitCapabilities
+	checkGitCapabilities = hook
+
+	return func() {
+		checkGitCapabilities = original
+	}
 }

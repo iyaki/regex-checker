@@ -25,6 +25,9 @@ components:
   ignore:
     in:
       - internal/ignore/**
+  git:
+    in:
+      - internal/git/**
   io:
     in:
       - internal/io/**
@@ -55,6 +58,9 @@ deps:
   ignore:
     anyProjectDeps: true
     anyVendorDeps: true
+  git:
+    anyProjectDeps: true
+    anyVendorDeps: false
   output:
     mayDependOn:
       - rules

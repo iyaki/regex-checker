@@ -12,6 +12,7 @@ import (
 
 	"github.com/iyaki/reglint/internal/baseline"
 	"github.com/iyaki/reglint/internal/config"
+	"github.com/iyaki/reglint/internal/git"
 	"github.com/iyaki/reglint/internal/output"
 	"github.com/iyaki/reglint/internal/rules"
 	"github.com/iyaki/reglint/internal/scan"
@@ -417,6 +418,10 @@ func runAnalyze(
 	}
 
 	request, failOn, consoleColorSettings := BuildScanRequest(cfg, ruleSet)
+	if err := runGitCapabilityChecks(cfg, request); err != nil {
+		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
+	}
+
 	result, err := scan.Run(request)
 	if err != nil {
 		return scan.Result{}, "", nil, nil, Config{}, output.ConsoleColorSettings{}, err
@@ -523,6 +528,35 @@ func buildGitRequest(settings rules.GitSettings) *scan.GitSelectionRequest {
 		AddedLinesOnly:   settings.AddedLinesOnly,
 		GitignoreEnabled: settings.GitignoreEnabled,
 	}
+}
+
+var checkGitCapabilities = git.CheckCapabilities
+
+func runGitCapabilityChecks(cfg Config, request scan.Request) error {
+	if request.Git == nil {
+		return nil
+	}
+
+	workingDir := resolveGitWorkingDir(cfg.Roots)
+
+	return checkGitCapabilities(git.CapabilityRequest{Mode: request.Git.Mode, WorkingDir: workingDir})
+}
+
+func resolveGitWorkingDir(roots []string) string {
+	if len(roots) == 0 {
+		return "."
+	}
+
+	firstRoot := filepath.Clean(roots[0])
+	info, err := os.Stat(firstRoot)
+	if err != nil {
+		return firstRoot
+	}
+	if info.IsDir() {
+		return firstRoot
+	}
+
+	return filepath.Dir(firstRoot)
 }
 
 func applyBaselineMode(cfg Config, result scan.Result, failOn string) (scan.Result, string, error) {
