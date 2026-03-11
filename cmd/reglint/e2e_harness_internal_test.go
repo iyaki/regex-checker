@@ -604,6 +604,23 @@ func newE2EFull010Scenario(moduleRoot, repoPath string) e2EScenario {
 	}
 }
 
+func newE2EFull011Scenario(moduleRoot, fixturePath string) e2EScenario {
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "example.yaml")
+
+	return e2EScenario{
+		ID:           "E2E-FULL-011",
+		Tier:         "full",
+		Name:         "git enabled run outside repository exits with single error",
+		Fixture:      fixturePath,
+		Command:      []string{"analyze", "--config", configPath, "--git-mode", "staged", "."},
+		ExpectedExit: 1,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionStdoutRegex, Value: `^git mode staged requires a git repository\n?$`},
+			{Type: e2EAssertionStdoutNotContains, Value: "Summary:"},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)

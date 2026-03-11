@@ -453,3 +453,21 @@ func TestE2EFull010GitAddedLinesOnlyReportsOnlyMatchesOnAddedLines(t *testing.T)
 	result := harness.mustRunScenario(t, scenario)
 	harness.assertScenarioStderrEmpty(t, scenario, result)
 }
+
+func TestE2EFull011GitEnabledRunOutsideRepoExitsWithSingleError(t *testing.T) {
+	ensureGitAvailable(t)
+
+	harness := newE2EHarness(t)
+
+	moduleRoot, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("resolve module root: %v", err)
+	}
+
+	nonRepoDir := t.TempDir()
+	writeFixture(t, nonRepoDir, "sample.txt", "token=abc\n")
+
+	scenario := newE2EFull011Scenario(moduleRoot, nonRepoDir)
+	result := harness.mustRunScenario(t, scenario)
+	harness.assertScenarioStderrEmpty(t, scenario, result)
+}
