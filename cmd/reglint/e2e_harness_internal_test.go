@@ -553,6 +553,31 @@ func newE2EFull008Scenario(moduleRoot, repoPath string) e2EScenario {
 	}
 }
 
+func newE2EFull009Scenario(moduleRoot, repoPath string) e2EScenario {
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "example.yaml")
+
+	return e2EScenario{
+		ID:      "E2E-FULL-009",
+		Tier:    "full",
+		Name:    "git mode diff scans only diff-selected files",
+		Fixture: repoPath,
+		Command: []string{
+			"analyze",
+			"--config", configPath,
+			"--format", "json",
+			"--git-mode", "diff",
+			"--git-diff", "HEAD",
+			".",
+		},
+		ExpectedExit: 0,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionJSONFieldEquals, Field: "schemaVersion", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.matches", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "matches.0.filePath", Expected: "changed.txt"},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)
