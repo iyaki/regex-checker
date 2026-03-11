@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -494,6 +495,34 @@ func TestE2EFull012BinaryAndOversizedFilesSkippedWithDeterministicStats(t *testi
 	}
 
 	scenario := newE2EFull012Scenario(moduleRoot, fixtureDir)
+	result := harness.mustRunScenario(t, scenario)
+	harness.assertScenarioStderrEmpty(t, scenario, result)
+}
+
+func TestE2EFull013UnreadableFilesRecordErrorsWhileScanContinues(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod permissions are unreliable on Windows")
+	}
+
+	harness := newE2EHarness(t)
+
+	moduleRoot, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("resolve module root: %v", err)
+	}
+
+	fixtureDir := t.TempDir()
+	writeFixture(t, fixtureDir, "scannable.txt", "token=abc\n")
+	blockedPath := writeFixture(t, fixtureDir, "unreadable.txt", "token=blocked\n")
+
+	if err := os.Chmod(blockedPath, 0o000); err != nil {
+		t.Fatalf("set unreadable permissions: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(blockedPath, 0o600)
+	})
+
+	scenario := newE2EFull013Scenario(moduleRoot, fixtureDir)
 	result := harness.mustRunScenario(t, scenario)
 	harness.assertScenarioStderrEmpty(t, scenario, result)
 }

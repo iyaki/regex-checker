@@ -641,6 +641,26 @@ func newE2EFull012Scenario(moduleRoot, fixturePath string) e2EScenario {
 	}
 }
 
+func newE2EFull013Scenario(moduleRoot, fixturePath string) e2EScenario {
+	configPath := filepath.Join(moduleRoot, "testdata", "rules", "example.yaml")
+
+	return e2EScenario{
+		ID:           "E2E-FULL-013",
+		Tier:         "full",
+		Name:         "unreadable files are skipped while scan continues",
+		Fixture:      fixturePath,
+		Command:      []string{"analyze", "--config", configPath, "--format", "json", "."},
+		ExpectedExit: 0,
+		Assertions: []e2EAssertion{
+			{Type: e2EAssertionJSONFieldEquals, Field: "schemaVersion", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.filesScanned", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.filesSkipped", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.matches", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "matches.0.filePath", Expected: "scannable.txt"},
+		},
+	}
+}
+
 func assertRegexMatch(value, pattern, streamName string) error {
 	if pattern == "" {
 		return fmt.Errorf("%s regex pattern is required", streamName)
