@@ -13,7 +13,7 @@ Status: Proposed
 
 - Support `.ignore`-style path filtering during `analyze` file discovery.
 - Load and apply ignore rules from `.ignore`, and `.reglintignore` by default.
-- Support optional `.gitignore` filtering for Git-enabled scan modes.
+- Enable `.gitignore` filtering by default for all scan modes.
 - Allow CLI and config overrides to disable ignore processing or customize ignore file names.
 - Preserve existing include/exclude and per-rule filtering semantics.
 
@@ -126,7 +126,7 @@ type IgnoreRule struct {
 - `ScanRequest` (see `specs/data-model.md`) is extended with effective ignore settings.
 - Ignore filtering happens before per-rule path/exclude checks in rule execution.
 - `Match` and formatter outputs are unchanged by this feature.
-- `.gitignore` support in Git-enabled scans is defined by `specs/git-integration.md`.
+- `.gitignore` support is enabled by default and may be disabled with CLI/config controls.
 
 ### Persistence Notes
 
@@ -178,7 +178,7 @@ Notes:
 
 - Ignore negation cannot re-include a path already removed by include/exclude filters.
 - Rule-level `paths` and `exclude` still apply during match evaluation.
-- When Git mode and `.gitignore` support are active, `.gitignore` is evaluated before `.ignore/.reglintignore`.
+- When `.gitignore` support is enabled, `.gitignore` is evaluated before `.ignore/.reglintignore`.
 - If `.gitignore`, `.ignore` or `.reglintignore` produce conflicting decisions for the same path, `.ignore` and `.reglintignore` has the highest priority, followed by `.ignore` and then `.gitignore`.
 - `.gitignore` cannot re-include paths excluded by earlier include/exclude decisions.
 - `.gitignore` support does not imply reading Git global excludes (`core.excludesFile`) or `.git/info/exclude`.
@@ -220,7 +220,7 @@ Notes:
 - `--no-ignore-files` has highest precedence and disables ignore processing.
 - Else, use RuleSet `ignoreFiles` when set.
 - Else, use the default ignore file list.
-- `.gitignore` processing is controlled by Git integration settings in `specs/git-integration.md` and can be disabled with `--no-gitignore`.
+- `.gitignore` processing is enabled by default and can be disabled with RuleSet `git.gitignoreEnabled: false` or `--no-gitignore`.
 
 ### YAML example
 
@@ -261,7 +261,7 @@ rules:
 - `reglint analyze --no-ignore-files ...` scans files that would otherwise be ignored.
 - Invalid ignore pattern reports `<ignore-file>:<line>` and exits with code `1`.
 - Runs with identical inputs produce identical file selection and output ordering.
-- In Git-enabled scans, `.gitignore` filtering applies when enabled and is skipped with `--no-gitignore`.
+- `.gitignore` filtering applies by default and is skipped with `--no-gitignore`.
 
 ## Appendices
 

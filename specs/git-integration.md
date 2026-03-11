@@ -12,7 +12,7 @@ Status: Proposed
 
 ### Goals
 
-- Support `.gitignore`-based filtering when Git integration is active.
+- Keep `.gitignore` filtering enabled by default, with optional CLI/config opt-out.
 - Support scanning only files in the staging area.
 - Support scanning only files from a Git diff target.
 - Support reporting matches only on lines added by the selected diff.
@@ -194,7 +194,7 @@ Notes:
 | `git.mode`             | string | no       | `off`   | Select Git mode: `off`, `staged`, or `diff`.                 |
 | `git.diff`             | string | no       | none    | Diff target/range for `git.mode=diff`.                       |
 | `git.addedLinesOnly`   | bool   | no       | `false` | Restrict reported matches to added lines in Git diff output. |
-| `git.gitignoreEnabled` | bool   | no       | `true`  | Enable `.gitignore` filtering in Git-enabled scans.          |
+| `git.gitignoreEnabled` | bool   | no       | `true`  | Enable `.gitignore` filtering across scans.                  |
 
 ### Analyze flag additions
 
