@@ -1,6 +1,6 @@
 # Implementation Plan (e2e-tests)
 
-**Status:** E2E spec and reference integration tests exist; compiled-binary e2e harness now includes build-once execution, typed scenarios, deterministic assertion catalog, ordering guarantees, replay diagnostics, complete smoke scenario coverage (`E2E-SMOKE-001..006`), complete full-tier scenario coverage (`E2E-FULL-001..015`), local make targets for both smoke and full tiers (`make test-e2e-smoke`, `make test-e2e`), a PR smoke CI gate, and a nightly/manual full CI workflow gate with scenario-level diagnostics in test failures; Phase 20 is now in progress with README e2e command guidance completed while full verification evidence remains outstanding.
+**Status:** E2E spec and reference integration tests exist; compiled-binary e2e harness now includes build-once execution, typed scenarios, deterministic assertion catalog, ordering guarantees, replay diagnostics, complete smoke scenario coverage (`E2E-SMOKE-001..006`), complete full-tier scenario coverage (`E2E-FULL-001..015`), local make targets for both smoke and full tiers (`make test-e2e-smoke`, `make test-e2e`), a PR smoke CI gate, a nightly/manual full CI workflow gate, and complete Phase 20 verification evidence/logging.
 **Last Updated:** 2026-03-11
 **Primary Specs:** `specs/e2e-test-suite.md` (related: `specs/testing-and-validations.md`, `specs/cli-analyze.md`, `specs/cli-init.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/git-integration.md`, `specs/core-architecture.md`)
 
@@ -187,15 +187,15 @@ Progress note:
 ## Phase 20: Verification evidence and documentation alignment
 
 **Goal:** Produce reproducible verification evidence and align user/developer docs with implemented e2e commands.
-**Status:** In progress
+**Status:** Complete
 **Paths:** `README.md`, `Makefile`, `.github/workflows/*.yml`, `cmd/reglint/` e2e tests, `IMPLEMENTATION_PLAN.md`
 **Reference pattern:** verification sections in `specs/e2e-test-suite.md` and `specs/testing-and-validations.md`
 
 ### 20.1 Verification runs and logging
 
-- [ ] Run and record: `make build`, `make test-e2e-smoke`, `make test-e2e`, and `make quality`.
-- [ ] Record scenario-level pass/fail evidence and deterministic rerun checks.
-- [ ] Document files touched for each verification/fix cycle.
+- [x] Run and record: `make build`, `make test-e2e-smoke`, `make test-e2e`, and `make quality`.
+- [x] Record scenario-level pass/fail evidence and deterministic rerun checks.
+- [x] Document files touched for each verification/fix cycle.
 
 ### 20.2 Documentation touchpoints
 
@@ -265,16 +265,16 @@ Progress note:
 
 ## Summary
 
-| Phase                                                       | Status      |
-| ----------------------------------------------------------- | ----------- |
-| Phase 15: Scope lock and stale-plan reset                   | Complete    |
-| Phase 16: Compiled-binary harness foundation                | Complete    |
-| Phase 17: Smoke tier implementation (PR gate)               | Complete    |
-| Phase 18: Full matrix implementation (nightly/manual)       | Complete    |
-| Phase 19: Developer tooling and CI gate wiring              | Complete    |
-| Phase 20: Verification evidence and documentation alignment | In progress |
+| Phase                                                       | Status   |
+| ----------------------------------------------------------- | -------- |
+| Phase 15: Scope lock and stale-plan reset                   | Complete |
+| Phase 16: Compiled-binary harness foundation                | Complete |
+| Phase 17: Smoke tier implementation (PR gate)               | Complete |
+| Phase 18: Full matrix implementation (nightly/manual)       | Complete |
+| Phase 19: Developer tooling and CI gate wiring              | Complete |
+| Phase 20: Verification evidence and documentation alignment | Complete |
 
-**Remaining effort:** Capture the remaining full execution evidence in Phase 20 (`make build`, `make test-e2e`, and `make quality`) and record results.
+**Remaining effort:** None. All planned e2e implementation phases are complete.
 
 ## Known Existing Work
 
@@ -391,3 +391,9 @@ None
 - 2026-03-11: go test ./cmd/reglint -run TestE2EFull014IgnorePrecedenceDeterministicReglintignoreOverrides|TestE2EFull015RepeatedRunsProduceStableOrdering - passed after implementing E2E-FULL-014 and E2E-FULL-015 scenarios.
 - 2026-03-11: make build && go test ./cmd/reglint -run TestE2E -count=1 && go test ./cmd/reglint - passed with E2E-SMOKE-001..006 and E2E-FULL-001..015 in compiled-binary harness plus full cmd/reglint package tests.
 - 2026-03-11: Edit IMPLEMENTATION_PLAN.md - marked E2E-FULL-014..015 and Phase 18 complete; refreshed remaining effort.
+- 2026-03-11: make build - passed (`go build -o bin/reglint ./cmd/reglint`; files touched: generated `bin/reglint`).
+- 2026-03-11: make test-e2e-smoke - passed (`go test -count=1 ./cmd/reglint -run '^TestE2ESmoke'`; files touched: none).
+- 2026-03-11: make test-e2e - passed (`go test -count=1 ./cmd/reglint -run '^TestE2E(Smoke|Full)'`; files touched: none).
+- 2026-03-11: make quality - passed (`go test ./...`, `golangci-lint run`, `go test -race ./...`, `go test -count=20 -shuffle=on ./...`, coverage gate, `gremlins unleash`, `govulncheck ./...`, `gosec ./...`, `go-arch-lint check`; files touched: generated `gremlins-output.json`, `report.json`).
+- 2026-03-11: go test -count=1 ./cmd/reglint -run '^TestE2E(Smoke|Full)' -v - passed with scenario-level evidence for `E2E-SMOKE-001..006`, `E2E-FULL-001..015`, and workflow contract test `TestE2EFullWorkflowExistsForNightlyAndManualRuns`.
+- 2026-03-11: go test -count=3 ./cmd/reglint -run '^TestE2EFull015RepeatedRunsProduceStableOrdering$' -v - passed (deterministic rerun ordering confirmed across three runs; files touched: none).
