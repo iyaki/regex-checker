@@ -428,3 +428,28 @@ func TestE2EFull009GitModeDiffScansOnlyDiffSelectedFiles(t *testing.T) {
 	result := harness.mustRunScenario(t, scenario)
 	harness.assertScenarioStderrEmpty(t, scenario, result)
 }
+
+func TestE2EFull010GitAddedLinesOnlyReportsOnlyMatchesOnAddedLines(t *testing.T) {
+	ensureGitAvailable(t)
+
+	harness := newE2EHarness(t)
+
+	moduleRoot, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("resolve module root: %v", err)
+	}
+
+	repoDir := t.TempDir()
+	initGitRepo(t, repoDir)
+
+	writeFixture(t, repoDir, "sample.txt", "token=old\nclean\n")
+	runGit(t, repoDir, "add", "sample.txt")
+	runGit(t, repoDir, "commit", "-m", "initial")
+
+	writeFixture(t, repoDir, "sample.txt", "token=old\nclean\ntoken=new\n")
+	runGit(t, repoDir, "add", "sample.txt")
+
+	scenario := newE2EFull010Scenario(moduleRoot, repoDir)
+	result := harness.mustRunScenario(t, scenario)
+	harness.assertScenarioStderrEmpty(t, scenario, result)
+}
