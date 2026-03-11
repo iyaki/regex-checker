@@ -1,20 +1,20 @@
 # Implementation Plan (e2e-tests)
 
-**Status:** E2E spec and reference integration tests exist; compiled-binary e2e harness now includes build-once execution, typed scenarios, deterministic assertion catalog, ordering guarantees, replay diagnostics, complete smoke scenario coverage (`E2E-SMOKE-001..006`), first seven full-tier scenarios (`E2E-FULL-001..007`), and a local smoke make target (`make test-e2e-smoke`), while the remaining full-tier scenarios, `make test-e2e`, and CI tier gates remain outstanding (Phases 15-17 complete; Phases 18-19 in progress; 3/6 phases complete).
+**Status:** E2E spec and reference integration tests exist; compiled-binary e2e harness now includes build-once execution, typed scenarios, deterministic assertion catalog, ordering guarantees, replay diagnostics, complete smoke scenario coverage (`E2E-SMOKE-001..006`), first eight full-tier scenarios (`E2E-FULL-001..008`), and a local smoke make target (`make test-e2e-smoke`), while the remaining full-tier scenarios, `make test-e2e`, and CI tier gates remain outstanding (Phases 15-17 complete; Phases 18-19 in progress; 3/6 phases complete).
 **Last Updated:** 2026-03-11
 **Primary Specs:** `specs/e2e-test-suite.md` (related: `specs/testing-and-validations.md`, `specs/cli-analyze.md`, `specs/cli-init.md`, `specs/formatter-json.md`, `specs/formatter-sarif.md`, `specs/git-integration.md`, `specs/core-architecture.md`)
 
 ## Quick Reference
 
-| System / Subsystem                                                         | Specs                                                                                 | Modules / Packages                                                                               | Artifacts                                                        | Status                                                                                                                 |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Canonical e2e scenario catalog and tier policy                             | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md` | `specs/`                                                                                         | Scenario IDs `E2E-SMOKE-*`, `E2E-FULL-*`                         | ✅ Implemented (spec-only)                                                                                             |
-| Existing command-level behavior coverage (in-process, not compiled binary) | `specs/cli.md`, `specs/cli-analyze.md`, `specs/cli-init.md`                           | `cmd/reglint/main_test.go`, `internal/cli/*_test.go`                                             | CLI contract tests for baseline, git, format, help, exit codes   | ✅ Implemented                                                                                                         |
-| File-handling and deterministic ordering reference tests                   | `specs/testing-and-validations.md`, `specs/e2e-test-suite.md`                         | `internal/scan/engine_test.go`, `internal/scan/ignore_test.go`, `internal/output/golden_test.go` | Binary/oversized/unreadable handling tests, golden outputs       | ✅ Implemented                                                                                                         |
-| Compiled-binary e2e scenario harness                                       | `specs/e2e-test-suite.md`                                                             | `cmd/reglint/e2e_harness_internal_test.go`, `cmd/reglint/e2e_harness_test.go`                    | Build-once harness + typed assertion engine + replay diagnostics | Partial (foundation + assertion engine + `E2E-SMOKE-001/002/003/004/005/006` + `E2E-FULL-001/002/003/004/005/006/007`) |
-| PR smoke and nightly/manual full make targets                              | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`                         | `Makefile`                                                                                       | `make test-e2e-smoke`, `make test-e2e`                           | Partial (`make test-e2e-smoke` implemented; `make test-e2e` missing)                                                   |
-| CI gate policy for e2e tiers                                               | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`                         | `.github/workflows/*.yml`                                                                        | PR smoke e2e job, nightly scheduled full e2e job                 | Missing                                                                                                                |
-| Scenario-specific fixture workspaces for path/permission/git edge cases    | `specs/e2e-test-suite.md`                                                             | `testdata/fixtures/`, `testdata/rules/`, `testdata/baseline/`, `testdata/golden/`                | Stable fixture matrix for 21 scenarios                           | Partial (base fixtures exist; dedicated e2e matrix missing)                                                            |
+| System / Subsystem                                                         | Specs                                                                                 | Modules / Packages                                                                               | Artifacts                                                        | Status                                                                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Canonical e2e scenario catalog and tier policy                             | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`, `specs/cli-analyze.md` | `specs/`                                                                                         | Scenario IDs `E2E-SMOKE-*`, `E2E-FULL-*`                         | ✅ Implemented (spec-only)                                                                                                 |
+| Existing command-level behavior coverage (in-process, not compiled binary) | `specs/cli.md`, `specs/cli-analyze.md`, `specs/cli-init.md`                           | `cmd/reglint/main_test.go`, `internal/cli/*_test.go`                                             | CLI contract tests for baseline, git, format, help, exit codes   | ✅ Implemented                                                                                                             |
+| File-handling and deterministic ordering reference tests                   | `specs/testing-and-validations.md`, `specs/e2e-test-suite.md`                         | `internal/scan/engine_test.go`, `internal/scan/ignore_test.go`, `internal/output/golden_test.go` | Binary/oversized/unreadable handling tests, golden outputs       | ✅ Implemented                                                                                                             |
+| Compiled-binary e2e scenario harness                                       | `specs/e2e-test-suite.md`                                                             | `cmd/reglint/e2e_harness_internal_test.go`, `cmd/reglint/e2e_harness_test.go`                    | Build-once harness + typed assertion engine + replay diagnostics | Partial (foundation + assertion engine + `E2E-SMOKE-001/002/003/004/005/006` + `E2E-FULL-001/002/003/004/005/006/007/008`) |
+| PR smoke and nightly/manual full make targets                              | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`                         | `Makefile`                                                                                       | `make test-e2e-smoke`, `make test-e2e`                           | Partial (`make test-e2e-smoke` implemented; `make test-e2e` missing)                                                       |
+| CI gate policy for e2e tiers                                               | `specs/e2e-test-suite.md`, `specs/testing-and-validations.md`                         | `.github/workflows/*.yml`                                                                        | PR smoke e2e job, nightly scheduled full e2e job                 | Missing                                                                                                                    |
+| Scenario-specific fixture workspaces for path/permission/git edge cases    | `specs/e2e-test-suite.md`                                                             | `testdata/fixtures/`, `testdata/rules/`, `testdata/baseline/`, `testdata/golden/`                | Stable fixture matrix for 21 scenarios                           | Partial (base fixtures exist; dedicated e2e matrix missing)                                                                |
 
 ## Phase 15: Scope lock and stale-plan reset
 
@@ -132,7 +132,8 @@ Progress note:
 
 - [x] Verified in-process references exist for `git-mode off|staged|diff|added-lines|outside-repo|invalid-target` in `cmd/reglint/main_test.go`.
 - [x] Implement compiled-binary scenario `E2E-FULL-007` (`--git-mode off` works when Git executable is unavailable).
-- [ ] Implement compiled-binary scenarios `E2E-FULL-008..011` with temp Git repos and controlled environment.
+- [x] Implement compiled-binary scenario `E2E-FULL-008` (`--git-mode staged` scans only staged files).
+- [ ] Implement compiled-binary scenarios `E2E-FULL-009..011` with temp Git repos and controlled environment.
 
 ### 18.3 File handling, ignore precedence, and ordering
 
@@ -269,7 +270,7 @@ Progress note:
 | Phase 19: Developer tooling and CI gate wiring              | In progress |
 | Phase 20: Verification evidence and documentation alignment | Not started |
 
-**Remaining effort:** Wire 8 remaining full-tier scenario IDs on top of the completed smoke/harness assertion model, add `make test-e2e`, add PR/nightly CI gates, and capture full execution evidence.
+**Remaining effort:** Wire 7 remaining full-tier scenario IDs on top of the completed smoke/harness assertion model, add `make test-e2e`, add PR/nightly CI gates, and capture full execution evidence.
 
 ## Known Existing Work
 
@@ -293,6 +294,7 @@ Progress note:
 - `cmd/reglint/e2e_harness_internal_test.go` now defines `newE2EFull005Scenario(...)`, and `cmd/reglint/e2e_harness_test.go` executes `E2E-FULL-005` for SARIF-only stdout behavior when `--out-sarif` is unset.
 - `cmd/reglint/e2e_harness_internal_test.go` now defines `newE2EFull006Scenario(...)`, and `cmd/reglint/e2e_harness_test.go` executes `E2E-FULL-006` for process-level multi-format output-path validation requiring explicit `--out-json`/`--out-sarif` in combined format runs.
 - `cmd/reglint/e2e_harness_internal_test.go` now defines `newE2EFull007Scenario(...)`, and `cmd/reglint/e2e_harness_test.go` executes `E2E-FULL-007` for process-level `--git-mode off` behavior when Git executable is unavailable.
+- `cmd/reglint/e2e_harness_internal_test.go` now defines `newE2EFull008Scenario(...)`, and `cmd/reglint/e2e_harness_test.go` executes `E2E-FULL-008` for process-level `--git-mode staged` staged-file-only behavior in a temporary Git repository fixture.
 
 ## Manual Deployment Tasks
 
@@ -325,3 +327,7 @@ None
 - 2026-03-11: go test ./cmd/reglint -run TestE2EFull007GitModeOffWorksWhenGitExecutableUnavailable - passed after implementing `E2E-FULL-007` compiled-binary git-mode-off scenario.
 - 2026-03-11: make build && go test ./cmd/reglint -run TestE2E && go test ./cmd/reglint - passed with `E2E-FULL-001..007` and full `cmd/reglint` package tests green.
 - 2026-03-11: Updated IMPLEMENTATION_PLAN.md - marked `E2E-FULL-007` complete and refreshed remaining full-tier effort.
+- 2026-03-11: go test ./cmd/reglint -run TestE2EFull008GitModeStagedScansOnlyStagedFiles - failed with undefined `newE2EFull008Scenario` (expected RED stage).
+- 2026-03-11: go test ./cmd/reglint -run TestE2EFull008GitModeStagedScansOnlyStagedFiles - passed after implementing `E2E-FULL-008` compiled-binary git-mode-staged scenario.
+- 2026-03-11: make build && go test ./cmd/reglint -run TestE2E && go test ./cmd/reglint - passed with `E2E-FULL-001..008` and full `cmd/reglint` package tests green.
+- 2026-03-11: Updated IMPLEMENTATION_PLAN.md - marked `E2E-FULL-008` complete and refreshed remaining full-tier effort.
