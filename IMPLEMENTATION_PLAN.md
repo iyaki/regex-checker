@@ -1,6 +1,6 @@
 # Implementation Plan (gitignore)
 
-**Status:** Partially Implemented (20/29 verified checklist items); core ignore pipeline and Git-mode precedence are in place, `.gitignore` applies by default in `git-mode=off`, and `--no-gitignore` now disables `.gitignore` in both Git and non-Git modes, with remaining config and e2e coverage work still open.
+**Status:** Partially Implemented (22/29 verified checklist items); core ignore pipeline and Git-mode precedence are in place, `.gitignore` applies by default in `git-mode=off`, `--no-gitignore` disables `.gitignore` in both Git and non-Git modes, and RuleSet `git.gitignoreEnabled: false` now has explicit regression coverage in both scan modes, with e2e and docs alignment work still open.
 **Last Updated:** 2026-03-12
 **Primary Specs:** `specs/ignore-files.md` (related: `specs/git-integration.md`, `specs/cli-analyze.md`, `specs/configuration.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md`, `specs/data-model.md`)
 
@@ -91,14 +91,14 @@
 - [x] Ensure `.gitignore` is applied by default when `--git-mode=off` (including non-repo scans).
 - [x] Preserve no-Git dependency in `git-mode=off` while enabling `.gitignore` matching.
 - [x] Ensure `--no-gitignore` disables `.gitignore` in both Git and non-Git modes.
-- [ ] Ensure RuleSet `git.gitignoreEnabled: false` disables `.gitignore` in both Git and non-Git modes.
+- [x] Ensure RuleSet `git.gitignoreEnabled: false` disables `.gitignore` in both Git and non-Git modes.
 - [ ] Preserve `--no-ignore-files` as highest-precedence global ignore disable.
 
 ### 23.2 Regression and contract tests
 
 - [x] Add/extend CLI test coverage for mode-off default `.gitignore` filtering.
 - [x] Add/extend CLI test coverage for mode-off `--no-gitignore` override behavior.
-- [ ] Add/extend config-driven test for `git.gitignoreEnabled: false` in mode-off execution.
+- [x] Add/extend config-driven test for `git.gitignoreEnabled: false` in mode-off execution.
 - [ ] Add/extend e2e scenario(s) to cover non-Git default `.gitignore` behavior at process boundary.
 
 **Definition of Done**
@@ -155,6 +155,8 @@
 - 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOffNoGitignoreFlagDisablesConfiguredGitignore|TestRunAnalyzeGitModeStagedNoGitignoreFlagDisablesConfiguredGitignore' - failed (expected behavior gap: `--no-gitignore` still applied configured `.gitignore` in mode-off; staged test fixture setup needed nested directory creation).
 - 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOffNoGitignoreFlagDisablesConfiguredGitignore|TestRunAnalyzeGitModeStagedNoGitignoreFlagDisablesConfiguredGitignore' - passed after removing configured `.gitignore` when gitignore is disabled and fixing staged fixture setup.
 - 2026-03-12: go test ./internal/cli ./cmd/reglint - passed after `--no-gitignore` override fix.
+- 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOffRuleSetGitignoreDisabledDisablesConfiguredGitignore|TestRunAnalyzeGitModeStagedRuleSetGitignoreDisabledDisablesConfiguredGitignore' - passed; added regression coverage for RuleSet `git.gitignoreEnabled: false` behavior in both non-Git and Git scan modes.
+- 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOff|TestRunAnalyzeGitModeStaged' - passed after adding RuleSet-driven `.gitignore` disable tests.
 
 ## Summary
 
@@ -165,7 +167,7 @@
 | Phase 23: Align runtime with default `.gitignore` across scan modes | In Progress     |
 | Phase 24: Documentation and verification evidence alignment         | Not Started     |
 
-**Remaining effort:** Finish Phase 23 override behaviors (`git.gitignoreEnabled: false`, `--no-ignore-files`) and e2e mode-off coverage, then complete Phase 24 docs and final quality evidence.
+**Remaining effort:** Finish Phase 23 override behavior coverage for `--no-ignore-files` and add e2e mode-off `.gitignore` coverage, then complete Phase 24 docs and final quality evidence.
 
 ## Known Existing Work
 
