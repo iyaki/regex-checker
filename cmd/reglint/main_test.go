@@ -919,6 +919,37 @@ func TestRunAnalyzeGitModeOffNoGitignoreFlagDisablesConfiguredGitignore(t *testi
 	}
 }
 
+func TestRunAnalyzeGitModeOffRuleSetGitignoreDisabledDisablesConfiguredGitignore(t *testing.T) {
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, ".gitignore", "sample.txt\n")
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfigWithPreamble(
+		t,
+		configDir,
+		gitignoreDisabledWithConfiguredIgnorePreamble,
+	)
+
+	t.Setenv("PATH", "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--format", "json",
+		"--git-mode", "off",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d with output %q", code, output.String())
+	}
+	got := decodeJSONResult(t, output.Bytes())
+	if len(got.Matches) != 1 {
+		t.Fatalf("expected 1 match with git.gitignoreEnabled=false in git-mode=off, got %d", len(got.Matches))
+	}
+}
+
 func TestRunAnalyzeGitModeStagedNoGitignoreFlagDisablesConfiguredGitignore(t *testing.T) {
 	t.Parallel()
 	ensureGitAvailable(t)
@@ -953,6 +984,49 @@ func TestRunAnalyzeGitModeStagedNoGitignoreFlagDisablesConfiguredGitignore(t *te
 	got := decodeJSONResult(t, output.Bytes())
 	if len(got.Matches) != 1 {
 		t.Fatalf("expected 1 match with --no-gitignore in git-mode=staged, got %d", len(got.Matches))
+	}
+	if got.Matches[0].FilePath != "generated/keep.txt" {
+		t.Fatalf("expected generated/keep.txt match, got %q", got.Matches[0].FilePath)
+	}
+}
+
+func TestRunAnalyzeGitModeStagedRuleSetGitignoreDisabledDisablesConfiguredGitignore(t *testing.T) {
+	t.Parallel()
+	ensureGitAvailable(t)
+
+	repoDir := t.TempDir()
+	initGitRepo(t, repoDir)
+
+	if err := os.MkdirAll(filepath.Join(repoDir, "generated"), os.ModePerm); err != nil {
+		t.Fatalf("failed to create generated directory: %v", err)
+	}
+	writeFixture(t, repoDir, ".gitignore", "generated/**\n")
+	writeFixture(t, repoDir, "generated/keep.txt", "token=abc\n")
+	runGit(t, repoDir, "add", "-f", "generated/keep.txt")
+
+	configDir := t.TempDir()
+	configPath := writeRuleConfigWithPreamble(
+		t,
+		configDir,
+		gitignoreDisabledWithConfiguredIgnorePreamble,
+	)
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--format", "json",
+		"--git-mode", "staged",
+		repoDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d with output %q", code, output.String())
+	}
+
+	got := decodeJSONResult(t, output.Bytes())
+	if len(got.Matches) != 1 {
+		t.Fatalf("expected 1 match with git.gitignoreEnabled=false in git-mode=staged, got %d", len(got.Matches))
 	}
 	if got.Matches[0].FilePath != "generated/keep.txt" {
 		t.Fatalf("expected generated/keep.txt match, got %q", got.Matches[0].FilePath)
@@ -1451,6 +1525,11 @@ func writeRuleConfig(t *testing.T, dir, failOn string) string {
 
 	return writeRuleConfigWithPreamble(t, dir, preamble)
 }
+
+const gitignoreDisabledWithConfiguredIgnorePreamble = "git:\n" +
+	"  gitignoreEnabled: false\n" +
+	"ignoreFiles:\n" +
+	"  - \".gitignore\"\n"
 
 func writeRuleConfigWithPreamble(t *testing.T, dir, preamble string) string {
 	t.Helper()
