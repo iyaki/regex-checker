@@ -514,23 +514,22 @@ func newE2EFull006Scenario(moduleRoot, outJSONPath string) e2EScenario {
 	}
 }
 
-func newE2EFull007Scenario(moduleRoot string) e2EScenario {
-	fixturePath := moduleRoot
+func newE2EFull007Scenario(moduleRoot, fixturePath string) e2EScenario {
 	configPath := filepath.Join(moduleRoot, "testdata", "rules", "example.yaml")
-	scanPath := filepath.Join("testdata", "fixtures")
 
 	return e2EScenario{
 		ID:           "E2E-FULL-007",
 		Tier:         "full",
-		Name:         "git mode off works when git executable is unavailable",
+		Name:         "git mode off applies .gitignore by default when git executable is unavailable",
 		Fixture:      fixturePath,
-		Command:      []string{"analyze", "--config", configPath, "--format", "json", "--git-mode", "off", scanPath},
+		Command:      []string{"analyze", "--config", configPath, "--format", "json", "--git-mode", "off", "."},
 		Env:          map[string]string{"PATH": ""},
 		ExpectedExit: 0,
 		Assertions: []e2EAssertion{
 			{Type: e2EAssertionJSONFieldEquals, Field: "schemaVersion", Expected: 1},
-			{Type: e2EAssertionJSONFieldEquals, Field: "stats.matches", Expected: 1},
-			{Type: e2EAssertionJSONFieldEquals, Field: "matches.0.filePath", Expected: "sample.txt"},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.filesScanned", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.filesSkipped", Expected: 1},
+			{Type: e2EAssertionJSONFieldEquals, Field: "stats.matches", Expected: 0},
 		},
 	}
 }

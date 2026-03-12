@@ -381,7 +381,11 @@ func TestE2EFull007GitModeOffWorksWhenGitExecutableUnavailable(t *testing.T) {
 		t.Fatalf("resolve module root: %v", err)
 	}
 
-	scenario := newE2EFull007Scenario(moduleRoot)
+	fixtureDir := t.TempDir()
+	writeFixture(t, fixtureDir, ".gitignore", "sample.txt\n")
+	writeFixture(t, fixtureDir, "sample.txt", "token=abc\n")
+
+	scenario := newE2EFull007Scenario(moduleRoot, fixtureDir)
 	result := harness.mustRunScenario(t, scenario)
 	harness.assertScenarioStderrEmpty(t, scenario, result)
 }
