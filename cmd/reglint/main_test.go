@@ -864,6 +864,33 @@ func TestRunAnalyzeGitModeOffDoesNotRequireGit(t *testing.T) {
 	}
 }
 
+func TestRunAnalyzeGitModeOffAppliesGitignoreByDefault(t *testing.T) {
+	rootDir := t.TempDir()
+	configDir := t.TempDir()
+	writeFixture(t, rootDir, ".gitignore", "sample.txt\n")
+	writeFixture(t, rootDir, "sample.txt", "token=abc")
+	configPath := writeRuleConfig(t, configDir, "")
+
+	t.Setenv("PATH", "")
+
+	var output bytes.Buffer
+	code := run([]string{
+		"analyze",
+		"--config", configPath,
+		"--format", "json",
+		"--git-mode", "off",
+		rootDir,
+	}, &output)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d with output %q", code, output.String())
+	}
+	got := decodeJSONResult(t, output.Bytes())
+	if len(got.Matches) != 0 {
+		t.Fatalf("expected 0 matches with git-mode=off when .gitignore excludes sample.txt, got %d", len(got.Matches))
+	}
+}
+
 func TestRunAnalyzeGitModeStagedWithoutGitBinaryReturnsError(t *testing.T) {
 	rootDir := t.TempDir()
 	configDir := t.TempDir()

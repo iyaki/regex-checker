@@ -374,13 +374,13 @@ func BuildScanRequest(cfg Config, ruleSet config.RuleSet) (scan.Request, string,
 
 	applyRuleSetOverrides(cfg, &effective)
 
-	ignoreSettings := resolveIgnoreSettings(effective)
-	consoleColorSettings := resolveConsoleColorSettings(effective)
-
 	resolvedGit := effective.Git
 	if settings, err := resolveEffectiveGitSettings(cfg, effective.Git); err == nil {
 		resolvedGit = settings
 	}
+
+	ignoreSettings := resolveIgnoreSettings(effective, resolvedGit)
+	consoleColorSettings := resolveConsoleColorSettings(effective)
 
 	request := scan.Request{
 		Roots:            append([]string{}, cfg.Roots...),
@@ -930,7 +930,7 @@ func resolveConsoleColorSettings(effective rules.RuleSet) output.ConsoleColorSet
 	return settings
 }
 
-func resolveIgnoreSettings(effective rules.RuleSet) scan.IgnoreSettings {
+func resolveIgnoreSettings(effective rules.RuleSet, gitSettings rules.GitSettings) scan.IgnoreSettings {
 	settings := scan.IgnoreSettings{
 		Enabled: true,
 		Files:   []string{".ignore", ".reglintignore"},
@@ -940,6 +940,9 @@ func resolveIgnoreSettings(effective rules.RuleSet) scan.IgnoreSettings {
 	}
 	if len(effective.IgnoreFiles) > 0 {
 		settings.Files = append([]string{}, effective.IgnoreFiles...)
+	}
+	if settings.Enabled && gitSettings.GitignoreEnabled {
+		settings.Files = mergeIgnoreFiles([]string{".gitignore"}, settings.Files)
 	}
 
 	return settings

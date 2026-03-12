@@ -352,6 +352,26 @@ func TestBuildScanRequestGitModeOffReturnsNilGitRequest(t *testing.T) {
 	}
 }
 
+func TestBuildScanRequestGitModeOffIncludesGitignoreByDefault(t *testing.T) {
+	t.Parallel()
+
+	ruleSet := config.RuleSet{
+		Rules: []config.Rule{{Message: "hello", Regex: "world"}},
+	}
+	cfg := cli.Config{
+		Roots:            []string{"./root"},
+		Concurrency:      1,
+		MaxFileSizeBytes: 10,
+	}
+
+	request, _, _ := cli.BuildScanRequest(cfg, ruleSet)
+
+	if request.Git != nil {
+		t.Fatal("expected nil git request in off mode")
+	}
+	assertStringSlice(t, "ignore files", request.Ignore.Files, []string{".gitignore", ".ignore", ".reglintignore"})
+}
+
 func stringPtr(value string) *string {
 	return &value
 }
