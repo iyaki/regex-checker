@@ -1,20 +1,20 @@
 # Implementation Plan (gitignore)
 
-**Status:** Partially Implemented (14/27 verified checklist items); core ignore pipeline and Git-mode precedence are in place, but `.gitignore` default behavior in `git-mode=off` is not yet verified/aligned with latest spec intent.
-**Last Updated:** 2026-03-11
+**Status:** Partially Implemented (18/29 verified checklist items); core ignore pipeline and Git-mode precedence are in place, and `.gitignore` now applies by default in `git-mode=off`, with remaining override and e2e coverage work still open.
+**Last Updated:** 2026-03-12
 **Primary Specs:** `specs/ignore-files.md` (related: `specs/git-integration.md`, `specs/cli-analyze.md`, `specs/configuration.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md`, `specs/data-model.md`)
 
 ## Quick Reference
 
-| System / Subsystem                              | Specs                                                         | Modules / Packages                                                                                                      | Artifacts                                                                           | Status                                            |
-| ----------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------- |
-| RuleSet and defaults for ignore behavior        | `specs/ignore-files.md`, `specs/configuration.md`             | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go`          | `RuleSet.ignoreFilesEnabled`, `RuleSet.ignoreFiles`, `RuleSet.git.gitignoreEnabled` | ✅ Implemented                                    |
-| CLI controls for ignore and gitignore           | `specs/ignore-files.md`, `specs/cli-analyze.md`               | `internal/cli/analyze.go`, `internal/cli/help.go`                                                                       | `--no-ignore-files`, `--no-gitignore`                                               | ✅ Implemented                                    |
-| Ignore parsing/loading/matching engine          | `specs/ignore-files.md`                                       | `internal/ignore/loader.go`, `internal/ignore/parser.go`, `internal/ignore/matcher.go`, `internal/scan/ignore_rules.go` | Deterministic ordered rule list with source+line metadata                           | ✅ Implemented                                    |
-| Scan-order precedence include/exclude -> ignore | `specs/ignore-files.md`, `specs/git-integration.md`           | `internal/scan/engine.go`                                                                                               | `evaluateFile(...)`, `collectScanEntries(...)` ordering contract                    | ✅ Implemented                                    |
-| Git hook augmentation for `.gitignore`          | `specs/git-integration.md`, `specs/cli-analyze.md`            | `internal/git/hook_provider.go`, `internal/hooks/scan_hooks.go`, `internal/cli/analyze.go`                              | `.gitignore` injected ahead of `.ignore/.reglintignore` for Git-enabled runs        | ✅ Implemented                                    |
-| `.gitignore` default in non-Git mode            | `specs/ignore-files.md` (`e6c8a35`)                           | `internal/cli/analyze.go`, `internal/git/hook_provider.go`                                                              | Behavior when `--git-mode=off`                                                      | [ ] Gap (not currently confirmed in runtime path) |
-| Regression and e2e coverage for precedence      | `specs/testing-and-validations.md`, `specs/e2e-test-suite.md` | `internal/scan/ignore_test.go`, `cmd/reglint/main_test.go`, `cmd/reglint/e2e_harness_*_test.go`                         | `E2E-FULL-014` and staged-mode precedence tests                                     | ✅ Implemented                                    |
+| System / Subsystem                              | Specs                                                         | Modules / Packages                                                                                                      | Artifacts                                                                           | Status         |
+| ----------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------- |
+| RuleSet and defaults for ignore behavior        | `specs/ignore-files.md`, `specs/configuration.md`             | `internal/config/model.go`, `internal/config/loader.go`, `internal/config/rules.go`, `internal/rules/model.go`          | `RuleSet.ignoreFilesEnabled`, `RuleSet.ignoreFiles`, `RuleSet.git.gitignoreEnabled` | ✅ Implemented |
+| CLI controls for ignore and gitignore           | `specs/ignore-files.md`, `specs/cli-analyze.md`               | `internal/cli/analyze.go`, `internal/cli/help.go`                                                                       | `--no-ignore-files`, `--no-gitignore`                                               | ✅ Implemented |
+| Ignore parsing/loading/matching engine          | `specs/ignore-files.md`                                       | `internal/ignore/loader.go`, `internal/ignore/parser.go`, `internal/ignore/matcher.go`, `internal/scan/ignore_rules.go` | Deterministic ordered rule list with source+line metadata                           | ✅ Implemented |
+| Scan-order precedence include/exclude -> ignore | `specs/ignore-files.md`, `specs/git-integration.md`           | `internal/scan/engine.go`                                                                                               | `evaluateFile(...)`, `collectScanEntries(...)` ordering contract                    | ✅ Implemented |
+| Git hook augmentation for `.gitignore`          | `specs/git-integration.md`, `specs/cli-analyze.md`            | `internal/git/hook_provider.go`, `internal/hooks/scan_hooks.go`, `internal/cli/analyze.go`                              | `.gitignore` injected ahead of `.ignore/.reglintignore` for Git-enabled runs        | ✅ Implemented |
+| `.gitignore` default in non-Git mode            | `specs/ignore-files.md` (`e6c8a35`)                           | `internal/cli/analyze.go`, `cmd/reglint/main_test.go`, `internal/cli/scan_request_test.go`                              | Behavior when `--git-mode=off`                                                      | ✅ Implemented |
+| Regression and e2e coverage for precedence      | `specs/testing-and-validations.md`, `specs/e2e-test-suite.md` | `internal/scan/ignore_test.go`, `cmd/reglint/main_test.go`, `cmd/reglint/e2e_harness_*_test.go`                         | `E2E-FULL-014` and staged-mode precedence tests                                     | ✅ Implemented |
 
 ## Phase 21: Scope reset and spec delta confirmation
 
@@ -68,7 +68,7 @@
 - [x] Verified unit coverage for parser/matcher/loader and ignore validation errors.
 - [x] Verified integration coverage for staged-mode precedence (`.reglintignore > .ignore > .gitignore`).
 - [x] Verified e2e coverage for precedence in `E2E-FULL-014`.
-- [ ] No direct test currently verifies `.gitignore` default filtering when `--git-mode=off`.
+- [x] Verified direct test coverage for `.gitignore` default filtering when `--git-mode=off`.
 
 **Definition of Done**
 
@@ -82,21 +82,21 @@
 ## Phase 23: Align runtime with default `.gitignore` across scan modes
 
 **Goal:** Close the gap between current implementation and spec intent from `e6c8a35`.
-**Status:** Not Started
+**Status:** In Progress
 **Paths:** `internal/cli/analyze.go`, `internal/git/hook_provider.go`, `internal/hooks/scan_hooks.go`, `internal/scan/ignore_rules.go`, `internal/scan/ignore_test.go`, `cmd/reglint/main_test.go`, `cmd/reglint/e2e_harness_*_test.go`
 **Reference pattern:** `internal/scan/ignore_test.go`, `cmd/reglint/main_test.go:841`, `cmd/reglint/e2e_harness_internal_test.go:664`
 
 ### 23.1 Runtime behavior updates
 
-- [ ] Ensure `.gitignore` is applied by default when `--git-mode=off` (including non-repo scans).
-- [ ] Preserve no-Git dependency in `git-mode=off` while enabling `.gitignore` matching.
+- [x] Ensure `.gitignore` is applied by default when `--git-mode=off` (including non-repo scans).
+- [x] Preserve no-Git dependency in `git-mode=off` while enabling `.gitignore` matching.
 - [ ] Ensure `--no-gitignore` disables `.gitignore` in both Git and non-Git modes.
 - [ ] Ensure RuleSet `git.gitignoreEnabled: false` disables `.gitignore` in both Git and non-Git modes.
 - [ ] Preserve `--no-ignore-files` as highest-precedence global ignore disable.
 
 ### 23.2 Regression and contract tests
 
-- [ ] Add/extend CLI test coverage for mode-off default `.gitignore` filtering.
+- [x] Add/extend CLI test coverage for mode-off default `.gitignore` filtering.
 - [ ] Add/extend CLI test coverage for mode-off `--no-gitignore` override behavior.
 - [ ] Add/extend config-driven test for `git.gitignoreEnabled: false` in mode-off execution.
 - [ ] Add/extend e2e scenario(s) to cover non-Git default `.gitignore` behavior at process boundary.
@@ -147,6 +147,11 @@
 - 2026-03-11: test read audit for `internal/scan/ignore_test.go`, `internal/git/hook_provider_test.go`, `internal/cli/{analyze_test.go,scan_request_test.go,analyze_output_test.go}`, `cmd/reglint/main_test.go`, `cmd/reglint/e2e_harness_*_test.go` - verified staged-mode precedence coverage and lack of explicit mode-off default `.gitignore` contract test; tests run: none; bug fixes discovered: none; files touched: none.
 - 2026-03-11: `git status --short` - verified clean tree before plan rewrite; tests run: none; bug fixes discovered: none; files touched: none.
 - 2026-03-11: Updated `IMPLEMENTATION_PLAN.md` for `gitignore` scope - replaced stale e2e plan with phase-based gitignore gap plan; tests run: none (plan-only update); bug fixes discovered: none; files touched: `IMPLEMENTATION_PLAN.md`.
+- 2026-03-12: go test ./internal/cli -run TestBuildScanRequestGitModeOffIncludesGitignoreByDefault - failed as expected; default mode-off ignore list did not include `.gitignore`.
+- 2026-03-12: go test ./cmd/reglint -run TestRunAnalyzeGitModeOffAppliesGitignoreByDefault - failed as expected; mode-off runtime scan did not apply `.gitignore`.
+- 2026-03-12: go test ./internal/cli -run 'TestBuildScanRequestGitModeOffIncludesGitignoreByDefault|TestBuildScanRequestCLIOverridesRuleSetGitSettings|TestBuildScanRequestUsesRuleSetGitSettingsWithoutCLIOverrides|TestParseAnalyzeGitDefaults|TestParseAnalyzeGitFlags' && go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOffDoesNotRequireGit|TestRunAnalyzeGitModeOffAppliesGitignoreByDefault' - passed.
+- 2026-03-12: go test ./internal/cli ./cmd/reglint - passed.
+- 2026-03-12: go test ./internal/scan ./internal/git ./internal/hooks - passed.
 
 ## Summary
 
@@ -154,10 +159,10 @@
 | ------------------------------------------------------------------- | --------------- |
 | Phase 21: Scope reset and spec delta confirmation                   | Complete        |
 | Phase 22: Confirmed existing implementation coverage                | Mostly Complete |
-| Phase 23: Align runtime with default `.gitignore` across scan modes | Not Started     |
+| Phase 23: Align runtime with default `.gitignore` across scan modes | In Progress     |
 | Phase 24: Documentation and verification evidence alignment         | Not Started     |
 
-**Remaining effort:** Implement and verify Phase 23 runtime/test updates (default mode-off `.gitignore` behavior + overrides), then complete Phase 24 docs and final quality evidence.
+**Remaining effort:** Finish Phase 23 override behaviors (`--no-gitignore`, `git.gitignoreEnabled: false`, `--no-ignore-files`) and e2e mode-off coverage, then complete Phase 24 docs and final quality evidence.
 
 ## Known Existing Work
 
