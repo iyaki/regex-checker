@@ -1,6 +1,6 @@
 # Implementation Plan (gitignore)
 
-**Status:** Partially Implemented (23/29 verified checklist items); core ignore pipeline and Git-mode precedence are in place, `.gitignore` applies by default in `git-mode=off`, `--no-gitignore` disables `.gitignore` in both Git and non-Git modes, RuleSet `git.gitignoreEnabled: false` has explicit regression coverage in both scan modes, and non-Git process-boundary `.gitignore` coverage is now validated in e2e.
+**Status:** Partially Implemented (25/29 verified checklist items); core ignore pipeline and Git-mode precedence are in place, `.gitignore` applies by default in `git-mode=off`, `--no-gitignore` disables `.gitignore` in both Git and non-Git modes, RuleSet `git.gitignoreEnabled: false` has explicit regression coverage in both scan modes, `--no-ignore-files` highest-precedence behavior is now locked by process-level regressions, and non-Git process-boundary `.gitignore` coverage is validated in e2e.
 **Last Updated:** 2026-03-12
 **Primary Specs:** `specs/ignore-files.md` (related: `specs/git-integration.md`, `specs/cli-analyze.md`, `specs/configuration.md`, `specs/testing-and-validations.md`, `specs/core-architecture.md`, `specs/data-model.md`)
 
@@ -82,7 +82,7 @@
 ## Phase 23: Align runtime with default `.gitignore` across scan modes
 
 **Goal:** Close the gap between current implementation and spec intent from `e6c8a35`.
-**Status:** In Progress
+**Status:** Complete
 **Paths:** `internal/cli/analyze.go`, `internal/git/hook_provider.go`, `internal/hooks/scan_hooks.go`, `internal/scan/ignore_rules.go`, `internal/scan/ignore_test.go`, `cmd/reglint/main_test.go`, `cmd/reglint/e2e_harness_*_test.go`
 **Reference pattern:** `internal/scan/ignore_test.go`, `cmd/reglint/main_test.go:841`, `cmd/reglint/e2e_harness_internal_test.go:664`
 
@@ -92,7 +92,7 @@
 - [x] Preserve no-Git dependency in `git-mode=off` while enabling `.gitignore` matching.
 - [x] Ensure `--no-gitignore` disables `.gitignore` in both Git and non-Git modes.
 - [x] Ensure RuleSet `git.gitignoreEnabled: false` disables `.gitignore` in both Git and non-Git modes.
-- [ ] Preserve `--no-ignore-files` as highest-precedence global ignore disable.
+- [x] Preserve `--no-ignore-files` as highest-precedence global ignore disable.
 
 ### 23.2 Regression and contract tests
 
@@ -158,6 +158,10 @@
 - 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOffRuleSetGitignoreDisabledDisablesConfiguredGitignore|TestRunAnalyzeGitModeStagedRuleSetGitignoreDisabledDisablesConfiguredGitignore' - passed; added regression coverage for RuleSet `git.gitignoreEnabled: false` behavior in both non-Git and Git scan modes.
 - 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOff|TestRunAnalyzeGitModeStaged' - passed after adding RuleSet-driven `.gitignore` disable tests.
 - 2026-03-12: go test ./cmd/reglint -run 'TestE2EFull007GitModeOffWorksWhenGitExecutableUnavailable|TestRunAnalyzeGitModeOffAppliesGitignoreByDefault' - passed; e2e process-boundary coverage now verifies default `.gitignore` filtering in `git-mode=off` without Git.
+- 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOffNoIgnoreFilesFlagDisablesAllIgnoreProcessing|TestRunAnalyzeGitModeStagedNoIgnoreFilesFlagDisablesAllIgnoreProcessing' - passed; added process-level regressions confirming `--no-ignore-files` bypasses `.gitignore`, `.ignore`, and `.reglintignore` in both scan modes.
+- 2026-03-12: go test ./cmd/reglint -run 'TestRunAnalyzeGitModeOff|TestRunAnalyzeGitModeStaged' - passed with new `--no-ignore-files` precedence contracts.
+- 2026-03-12: go test ./cmd/reglint - passed after no-ignore-files precedence regression additions.
+- 2026-03-12: go test ./internal/scan ./internal/cli ./internal/git ./internal/hooks - passed; targeted internal suites remain green after no-ignore-files contract coverage updates.
 
 ## Summary
 
@@ -165,10 +169,10 @@
 | ------------------------------------------------------------------- | --------------- |
 | Phase 21: Scope reset and spec delta confirmation                   | Complete        |
 | Phase 22: Confirmed existing implementation coverage                | Mostly Complete |
-| Phase 23: Align runtime with default `.gitignore` across scan modes | In Progress     |
+| Phase 23: Align runtime with default `.gitignore` across scan modes | Complete        |
 | Phase 24: Documentation and verification evidence alignment         | Not Started     |
 
-**Remaining effort:** Finish Phase 23 override behavior coverage for `--no-ignore-files`, then complete Phase 24 docs and final quality evidence.
+**Remaining effort:** Complete Phase 24 documentation alignment and final quality evidence (`make test`, optionally `make quality` if scope expands).
 
 ## Known Existing Work
 
