@@ -95,6 +95,9 @@ Git mode is optional and defaults to `off`, so regular scans do not require Git:
 reglint analyze --config reglint-rules.yaml
 ```
 
+Ignore files are enabled by default in all scan modes (`off`, `staged`, and `diff`).
+When enabled, RegLint evaluates `.gitignore` first, then `.ignore`, then `.reglintignore`.
+
 Scan only staged files:
 
 ```bash
@@ -119,10 +122,16 @@ Report only matches on added lines in the selected Git scope:
 reglint analyze --config reglint-rules.yaml --git-mode diff --git-diff HEAD~1..HEAD --git-added-lines-only
 ```
 
-Disable `.gitignore` filtering for one run:
+Disable only `.gitignore` filtering for one run:
 
 ```bash
 reglint analyze --config reglint-rules.yaml --git-mode staged --no-gitignore
+```
+
+Disable all ignore-file processing for one run (`.gitignore`, `.ignore`, and `.reglintignore`):
+
+```bash
+reglint analyze --config reglint-rules.yaml --no-ignore-files
 ```
 
 Expected exit behavior in Git-enabled runs:
